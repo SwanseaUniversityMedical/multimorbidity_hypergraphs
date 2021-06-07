@@ -227,6 +227,11 @@ def _iterate_vector(incidence_matrix, weight, vector):
 class Hypergraph(object):
 
     def __init__(self):
+        """
+        Create an instance of a hypergraph object.
+        Currently does no computations.
+        """
+    
     
         self.incidence_matrix = None
         self.edge_weights = None
@@ -236,7 +241,11 @@ class Hypergraph(object):
     
         return
 
-    def compute_hypergraph(self, data):
+    def compute_hypergraph(
+        self, 
+        data,
+        weight_function = _overlap_coefficient_numba
+    ):
         """
         Compute the incidence matrix and weights of a weighted, undirected hypergraph.
 
@@ -254,6 +263,15 @@ class Hypergraph(object):
                 and columns to diseases. Entries of the dataframe should be zero
                 or one indicating the person does not or does have the disease
                 respectively.
+                
+            weight_function : callable, optional
+                A function that computes the hypergraph weights. This must be a 
+                callable function that takes two arguments (a numpy array of 
+                data and a list of edges to compute weights for) and returns the 
+                incidence_matrix (a 2d numpy array), the edge weights (a 1d numpy
+                array) and the node weights (also a 1d numpy array). By default,
+                a numba compile function calculates the overlap coefficient as the 
+                edge weights and the crude prevalence as the node weight.
 
         Sets
         ----
@@ -313,7 +331,7 @@ class Hypergraph(object):
 
 
         # compute the weights
-        (inc_mat, edge_weight, node_weight) = _overlap_coefficient_numba(data_array, work_list)
+        (inc_mat, edge_weight, node_weight) = weight_function(data_array, work_list)
         # traverse the edge list again to create a list of string labels
         edge_list_out = [tuple([node_list_string[jj] for jj in ii]) for ii in edge_list]
 
@@ -514,6 +532,36 @@ class Hypergraph(object):
         )   
 
 
+def unweighted_hypergraph_fn(data, work_list):
+    """
+    Sets all hypergraph weights to 1, creating an unweighted hypergraph. 
+    """
+    incidence_matrix = np.zeros(shape=(work_list.shape[0], work_list.shape[1] + 1), dtype=np.uint8)
+    for index in range(work_list.shape[0]):
+
+        inds = work_list[index, :]
+        inds = inds[inds != -1]
+        n_diseases = inds.shape[0]
+
+        numerator = 0.0
+
+        for ii in range(data.shape[0]):
+            loop_sum = 0
+            for jj in range(n_diseases):
+                loop_sum += data[ii, inds[jj]]
+
+            if loop_sum == n_diseases:
+                numerator += 1.0
+                
+            for jj in range(n_diseases):
+                incidence_matrix[index, inds[jj]] = 1
+
+    node_weight = np.ones(shape=data.shape[1], dtype=np.float64)
+    edge_weight = np.ones(shape=work_list.shape[0], dtype=np.float64)
+
+    return (incidence_matrix, edge_weight, node_weight)
+        
+
 if __name__ == "__main__":
 
     print("this is here for testing purposes only")
@@ -525,7 +573,7 @@ if __name__ == "__main__":
     data = pd.DataFrame(data_np).rename(columns={i:"disease_{}".format(i) for i in range(n_features)})
     
     h = Hypergraph()
-    h.compute_hypergraph(data)
+    h.compute_hypergraph(data, weight_function=unweighted_hypergraph_fn)
     
     print(h.incidence_matrix.shape)
     e_val, e_val_err, e_vec = h.eigenvector_centrality(rep="bipartite")
