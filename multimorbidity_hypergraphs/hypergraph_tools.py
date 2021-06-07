@@ -255,28 +255,31 @@ class Hypergraph(object):
                 or one indicating the person does not or does have the disease
                 respectively.
 
-        Returns
-        -------
+        Sets
+        ----
 
-            numpy.array
-                The incidence_matrix, a n_nodes * n_edges matrix such
+            incidence_matrix (numpy.array)
+                a n_nodes * n_edges matrix such
                 that M * W * M.T is the adjacency matrix of the hypergraph, i.e. each
                 element of the incidence matrix is a flag indicating whether
                 there is a connection between the appropriate node and edge.
 
-            numpy.array
+            edge_weight (numpy.array)
                 The edge weight vector, a one dimensional array of length n_edges
                 that contains the calculated edge weights.
 
-            numpy.array
+            node_weight (numpy.array)
                 The node weight vector, a one dimensional array of length n_nodes
                 that contains the calculated node weights.
 
-            list
+            edge_list (list)
                 The edge list, a list of edges each element of which is a tuple of strings
                 derived from the names of the pandas.DataFrame columns and indicates the
                 order of edges in the incidence matrix. This is required
                 because the edge list is randomly shuffled to improve perfomance.
+                
+            node_list (list)
+                A list of nodes derived from the keys of the input pandas dataframe.
 
         """
 
@@ -326,13 +329,11 @@ class Hypergraph(object):
 
     def eigenvector_centrality(
             self,
-            #incidence_matrix,
-            #weight,
-            # TODO a flag for standard, dual or bipartite reps.
+            rep = "standard",
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
-            bipartite=False,
+            #bipartite=False,
             verbose=False,
         ):
 
@@ -411,9 +412,25 @@ class Hypergraph(object):
                 the same as the order passed in via the incidence matrix.
 
         """
+        
+        # 0) setup 
+        rng = np.random.default_rng(random_seed)
+        if rep == "standard":
+            inc_mat = self.incidence_matrix.T 
+            old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[1], dtype='float64')
+            weight = self.edge_weights
+        elif rep == "dual":
+            inc_mat = self.incidence_matrix 
+            old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
+            weight = self.node_weights
+        elif rep == "bipartite":
+            print(self.incidence_matrix.shape)
+            old_eigenvector_estimate = rng.random(np.sum(self.incidence_matrix.shape), dtype='float64')
+            inc_mat = np.dot(self.incidence_matrix.T, np.diag(self.edge_weights)).T
+            
+            
         # 1) Check we don't have an adjacency matrix by checking the size of incidence matrix
-
-        long_axis_size, short_axis_size = np.shape(self.incidence_matrix)
+        long_axis_size, short_axis_size = np.shape(inc_mat)
         if long_axis_size == short_axis_size:
             # What's the probability of having the same number of nodes and edges by chance?!
             raise Exception(
@@ -421,30 +438,26 @@ class Hypergraph(object):
             )
 
         # Check the incidence matrix is the right datatype
-        if self.incidence_matrix.dtype != np.uint8:
-            if verbose:
-                print("Converting incidence matrix type to u8")
-            self.incidence_matrix = self.incidence_matrix.astype(np.uint8)
+        #if inc_mat.dtype != np.uint8:
+        #    if verbose:
+        #        print("Converting incidence matrix type to u8")
+        #    inc_mat = inc_mat.astype(np.uint8)
 
         # Check the weight vector is the right shape
-        weight = self.node_weights
-        if short_axis_size != len(weight):
+        if rep != "bipartite" and short_axis_size != len(weight):
             raise Exception(
                 ("The weight vector and the second index of the "+
                  "incidence matrix must be the same length")
             )
 
-        rng = np.random.default_rng(random_seed)
-
         # 2) do the Chebyshev
 
 
         # Normalised random initial vector
-        if bipartite:
-            old_eigenvector_estimate = rng.random(long_axis_size + short_axis_size, dtype='float64')
-            self.incidence_matrix = np.dot(self.incidence_matrix.T, np.diag(weight)).T
-        else:
-            old_eigenvector_estimate = rng.random(long_axis_size, dtype='float64')
+        #if bipartite:
+        #    
+        #else:
+            
         old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
 
         eigenvalue_estimates, eigenvalue_error_estimates = [], []
@@ -459,14 +472,14 @@ class Hypergraph(object):
             if verbose:
                 print("\rRunning iteration {}...".format(iteration), end="")
 
-            if bipartite:
+            if rep == "bipartite":
                 new_eigenvector_estimate = _iterate_vector_bipartite(
-                    self.incidence_matrix,
+                    inc_mat,
                     old_eigenvector_estimate
                 )
             else:
                 new_eigenvector_estimate = _iterate_vector(
-                    self.incidence_matrix,
+                    inc_mat,
                     weight,
                     old_eigenvector_estimate
                 )
@@ -509,7 +522,7 @@ class Hypergraph(object):
                     )
                 )
 
-        if bipartite:
+        if rep == "bipartite":
             eigenvalue_estimate = eigenvalue_estimate - 1.0
 
         return (
@@ -532,8 +545,8 @@ if __name__ == "__main__":
     h = Hypergraph()
     h.compute_hypergraph(data)
     
-    
-    print(h.incidence_matrix)
-    
+    print(h.incidence_matrix.shape)
+    e_val, e_val_err, e_vec = h.eigenvector_centrality(rep="bipartite")
+    print(e_vec.shape)
     
     
