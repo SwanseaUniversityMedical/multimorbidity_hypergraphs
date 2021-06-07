@@ -258,28 +258,33 @@ class Hypergraph(object):
         Sets
         ----
 
-            incidence_matrix (numpy.array)
+            incidence_matrix : numpy.array
                 a n_nodes * n_edges matrix such
                 that M * W * M.T is the adjacency matrix of the hypergraph, i.e. each
                 element of the incidence matrix is a flag indicating whether
                 there is a connection between the appropriate node and edge.
 
-            edge_weight (numpy.array)
+            edge_weight : numpy.array
                 The edge weight vector, a one dimensional array of length n_edges
                 that contains the calculated edge weights.
 
-            node_weight (numpy.array)
+            node_weight : numpy.array
                 The node weight vector, a one dimensional array of length n_nodes
                 that contains the calculated node weights.
 
-            edge_list (list)
+            edge_list : list
                 The edge list, a list of edges each element of which is a tuple of strings
                 derived from the names of the pandas.DataFrame columns and indicates the
                 order of edges in the incidence matrix. This is required
                 because the edge list is randomly shuffled to improve perfomance.
                 
-            node_list (list)
+            node_list : list
                 A list of nodes derived from the keys of the input pandas dataframe.
+                
+        Returns
+        -------
+        
+            None
 
         """
 
@@ -333,7 +338,6 @@ class Hypergraph(object):
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
-            #bipartite=False,
             verbose=False,
         ):
 
@@ -355,28 +359,22 @@ class Hypergraph(object):
         Examples
         --------
 
-        >>> eigenvector_centrality(inc_mat.T, edge_weight)
+        >>> h = Hypergraph()
+        >>> h.eigenvector_centrality()
         computes the eigenvector centrality of the standard hypergraph.
 
-        >>> eigenvector_centrality(inc_mat, node_weight)
+        >>> h.eigenvector_centrality(rep="dual")
         computes the eigenvector centrality of the dual hypergraph.
 
-        >>> eigenvector_centrality(inc_mat, node_weight, bipartite=True)
+        >>> h.eigenvector_centrality(rep="bipartite")
         computes the eigenvector centrality of the bipartite representation of the hypergraph.
 
         Parameters
         ----------
-            incidence_matrix : numpy.array
-                The incidence matrix (M) of the hypergraph. this is an n x m
-                matrix such that M^T * W * M is the adjacency matrix. Can use
-                the output of compute_hypergraph here
-
-            weight : numpy.array
-                A vector corresponding to the weights of the hypergraph. The length
-                of this vector must be equal to the length of the second axis
-                of the incidence matrix (since the adjacency matrix is calculated
-                as M^T * W * M). This function can be used with unweighted hypergraphs
-                by passing in an array of ones of the appropriate length.
+            rep : string, optional 
+                The representation of the hypergraph for which to calculate the 
+                eigenvector centrality. Options are "standard", "dual" or "bipartite"
+                (default "standard")
 
             tolerance : float, optional
                 The difference between iterations in the eigenvalue at which to
@@ -388,11 +386,6 @@ class Hypergraph(object):
 
             random_seed : int, optional
                 The random seed to use in generating the initial vector (default: 12345)
-
-            bipartite : bool, optional
-                Whether or not to compute the eigenvector centrality of the bipartite representation
-                of the hypergraph. This allows one to compute a centrality for the nodes and edges
-                of the graph together. (default: False)
 
             verbose : bool, optional
                 When this is set to true the function produces additional output to stdout
@@ -413,6 +406,11 @@ class Hypergraph(object):
 
         """
         
+        # Much of this code is inspired by a solution provided to me by Ed Bennett of 
+        # SA2C in this repo: 
+        # https://github.com/sa2c/chebysolve
+        # Thank you Ed! 
+        
         # 0) setup 
         rng = np.random.default_rng(random_seed)
         if rep == "standard":
@@ -429,21 +427,12 @@ class Hypergraph(object):
             inc_mat = np.dot(self.incidence_matrix.T, np.diag(self.edge_weights)).T
             
             
-        # 1) Check we don't have an adjacency matrix by checking the size of incidence matrix
-        long_axis_size, short_axis_size = np.shape(inc_mat)
-        if long_axis_size == short_axis_size:
-            # What's the probability of having the same number of nodes and edges by chance?!
-            raise Exception(
-                "This function must be called on the incidence matrix, not the adjacency matrix"
-            )
-
-        # Check the incidence matrix is the right datatype
-        #if inc_mat.dtype != np.uint8:
-        #    if verbose:
-        #        print("Converting incidence matrix type to u8")
-        #    inc_mat = inc_mat.astype(np.uint8)
+        # 1) Initial checks
 
         # Check the weight vector is the right shape
+        # not sure this is needd because both of these variables are coming from
+        # internal state, but we'll keep it unless we end up with a reason to 
+        # get rid of it. 
         if rep != "bipartite" and short_axis_size != len(weight):
             raise Exception(
                 ("The weight vector and the second index of the "+
@@ -451,13 +440,6 @@ class Hypergraph(object):
             )
 
         # 2) do the Chebyshev
-
-
-        # Normalised random initial vector
-        #if bipartite:
-        #    
-        #else:
-            
         old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
 
         eigenvalue_estimates, eigenvalue_error_estimates = [], []
