@@ -10,6 +10,9 @@ import itertools
 import numpy as np
 import numba
 
+##########################################
+## Numba compiled functions here 
+
 @numba.jit(
         numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:])) # outputs
         (numba.uint8[:, :], numba.int8[:, :]), # inputs
@@ -18,7 +21,7 @@ import numba
     parallel=True,
     fastmath=True,
 )
-def overlap_coefficient_numba(data, work_list):
+def _overlap_coefficient_numba(data, work_list):
     """
     This function takes a data table and computes the overlap
     coefficient for all combinations spectified in the work list.
@@ -101,87 +104,6 @@ def overlap_coefficient_numba(data, work_list):
 
     return (incidence_matrix, edge_weight, node_weight)
 
-def compute_hypergraph(data):
-    """
-    Compute the incidence matrix and weights of a weighted, undirected hypergraph.
-
-    The weight function used is the overlap coefficient for edges and the crude
-    prevalence for nodes.
-
-    In jupyter, set the number of CPUs to use by executing
-    the following before the function call:
-    %env NUMBA_NUM_THREADS=n
-
-    Parameters
-    ----------
-        data : pandas.DataFrame
-            A pandas dataframe with rows corresponding to individuals
-            and columns to diseases. Entries of the dataframe should be zero
-            or one indicating the person does not or does have the disease
-            respectively.
-
-    Returns
-    -------
-
-        numpy.array
-            The incidence_matrix, a n_nodes * n_edges matrix such
-            that M * W * M.T is the adjacency matrix of the hypergraph, i.e. each
-            element of the incidence matrix is a flag indicating whether
-            there is a connection between the appropriate node and edge.
-
-        numpy.array
-            The edge weight vector, a one dimensional array of length n_edges
-            that contains the calculated edge weights.
-
-        numpy.array
-            The node weight vector, a one dimensional array of length n_nodes
-            that contains the calculated node weights.
-
-        list
-            The edge list, a list of edges each element of which is a tuple of strings
-            derived from the names of the pandas.DataFrame columns and indicates the
-            order of edges in the incidence matrix. This is required
-            because the edge list is randomly shuffled to improve perfomance.
-
-    """
-
-    # construct a matrix of flags from the pandas input
-    data_array = data.to_numpy().astype(np.uint8)
-
-    # create a list of edges (numpy array of indices)
-    node_list_string = data.keys().tolist()
-    node_list = list(range(data_array.shape[1]))
-    edge_list = list(
-        itertools.chain(
-            *[itertools.combinations(node_list, ii) for ii in range(2, len(node_list))]
-        )
-    )
-    max_edge = np.max([len(ii) for ii in edge_list])
-    work_list = np.array(
-        [list(ii) + [-1] * (max_edge - len(ii)) for ii in edge_list],
-        dtype=np.int8
-    )
-
-    # shuffle the work list to improve runtime
-    reindex = np.arange(work_list.shape[0])
-    np.random.shuffle(reindex)
-    work_list = work_list[reindex, :]
-    edge_list = np.array(edge_list)[reindex].tolist()
-
-
-    # compute the weights
-    (inc_mat, edge_weight, node_weight) = overlap_coefficient_numba(data_array, work_list)
-    # traverse the edge list again to create a list of string labels
-    edge_list_out = [tuple([node_list_string[jj] for jj in ii]) for ii in edge_list]
-
-    # get rid of rows that are all zero.
-    inds = edge_weight > 0
-    inc_mat = inc_mat[inds, :]
-    edge_weight = edge_weight[inds]
-    edge_list_out = np.array(edge_list_out)[inds].tolist()
-
-    return inc_mat, edge_weight, node_weight, edge_list_out
-
 
 @numba.jit(
     numba.float64[:](numba.float64[:, :], numba.float64[:]),
@@ -189,7 +111,7 @@ def compute_hypergraph(data):
     parallel=True,
     fastmath=True,
 )
-def __iterate_vector_bipartite(matrix, vector):
+def _iterate_vector_bipartite(matrix, vector):
     '''
     This function performs one Chebyshev iteration to calculate the
     largest eigenvalue and corresponding eigenvector of the bipartite
@@ -250,7 +172,7 @@ def __iterate_vector_bipartite(matrix, vector):
     parallel=True,
     fastmath=True,
 )
-def __iterate_vector(incidence_matrix, weight, vector):
+def _iterate_vector(incidence_matrix, weight, vector):
     '''
     This function performs one Chebyshev iteration to calculate the
     largest eigenvalue and corresponding eigenvector of the either the
@@ -299,198 +221,319 @@ def __iterate_vector(incidence_matrix, weight, vector):
 
     return result
 
-def eigenvector_centrality(
-        incidence_matrix,
-        weight,
-        tolerance=1e-6,
-        max_iterations=100,
-        random_seed=12345,
-        bipartite=False,
-        verbose=False,
-    ):
+##########################################
+## Public API here 
 
-    """
-    This function uses a Chebyshev algorithm to find the eigenvector
-    and largest eigenvalue (corresponding to the eigenvector
-    centrality) from the incidence matrix and a weight vector.
-    Note, the adjacency matrix is calculated using M * W * C^T, so the
-    size of the first dimension of the incidence matrix will be the
-    length of the returned eigenvector
+class Hypergraph(object):
 
-    In jupyter, set the number of CPUs to use by executing
-    the following before the function call:
-    %env NUMBA_NUM_THREADS=n
+    def __init__(self):
+    
+        self.incidence_matrix = None
+        self.edge_weights = None
+        self.node_weights = None
+        self.edge_list = None
+        self.node_list = None
+    
+        return
 
-    One may use this function to compute the centrality of the standard,
-    the dual hypergraph or the bipartite represention of the hypergraph
+    def compute_hypergraph(self, data):
+        """
+        Compute the incidence matrix and weights of a weighted, undirected hypergraph.
 
-    Examples
-    --------
+        The weight function used is the overlap coefficient for edges and the crude
+        prevalence for nodes.
 
-    >>> eigenvector_centrality(inc_mat.T, edge_weight)
-    computes the eigenvector centrality of the standard hypergraph.
+        In jupyter, set the number of CPUs to use by executing
+        the following before the function call:
+        %env NUMBA_NUM_THREADS=n
 
-    >>> eigenvector_centrality(inc_mat, node_weight)
-    computes the eigenvector centrality of the dual hypergraph.
+        Parameters
+        ----------
+            data : pandas.DataFrame
+                A pandas dataframe with rows corresponding to individuals
+                and columns to diseases. Entries of the dataframe should be zero
+                or one indicating the person does not or does have the disease
+                respectively.
 
-    >>> eigenvector_centrality(inc_mat, node_weight, bipartite=True)
-    computes the eigenvector centrality of the bipartite representation of the hypergraph.
+        Returns
+        -------
 
-    Parameters
-    ----------
-        incidence_matrix : numpy.array
-            The incidence matrix (M) of the hypergraph. this is an n x m
-            matrix such that M^T * W * M is the adjacency matrix. Can use
-            the output of compute_hypergraph here
+            numpy.array
+                The incidence_matrix, a n_nodes * n_edges matrix such
+                that M * W * M.T is the adjacency matrix of the hypergraph, i.e. each
+                element of the incidence matrix is a flag indicating whether
+                there is a connection between the appropriate node and edge.
 
-        weight : numpy.array
-            A vector corresponding to the weights of the hypergraph. The length
-            of this vector must be equal to the length of the second axis
-            of the incidence matrix (since the adjacency matrix is calculated
-            as M^T * W * M). This function can be used with unweighted hypergraphs
-            by passing in an array of ones of the appropriate length.
+            numpy.array
+                The edge weight vector, a one dimensional array of length n_edges
+                that contains the calculated edge weights.
 
-        tolerance : float, optional
-            The difference between iterations in the eigenvalue at which to
-            assume the algorithm has converged (default: 1e-6)
+            numpy.array
+                The node weight vector, a one dimensional array of length n_nodes
+                that contains the calculated node weights.
 
-        max_iterations : int, optional
-            The maximum number of iterations to perform before terminating the
-            algorithm and assuming it has not converged (default: 100)
+            list
+                The edge list, a list of edges each element of which is a tuple of strings
+                derived from the names of the pandas.DataFrame columns and indicates the
+                order of edges in the incidence matrix. This is required
+                because the edge list is randomly shuffled to improve perfomance.
 
-        random_seed : int, optional
-            The random seed to use in generating the initial vector (default: 12345)
+        """
 
-        bipartite : bool, optional
-            Whether or not to compute the eigenvector centrality of the bipartite representation
-            of the hypergraph. This allows one to compute a centrality for the nodes and edges
-            of the graph together. (default: False)
+        # construct a matrix of flags from the pandas input
+        data_array = data.to_numpy().astype(np.uint8)
 
-        verbose : bool, optional
-            When this is set to true the function produces additional output to stdout
-            (default: False)
-
-    Returns
-    -------
-
-        float
-            The calculated largest eigenvalue of the adjacency matrix
-
-        float
-            The calculated error in the eigenvalue
-
-        numpy.array
-            the eigenvector centrality of the hypergraph. The order of the elements is
-            the same as the order passed in via the incidence matrix.
-
-    """
-    # 1) Check we don't have an adjacency matrix by checking the size of incidence matrix
-
-    long_axis_size, short_axis_size = np.shape(incidence_matrix)
-    if long_axis_size == short_axis_size:
-        # What's the probability of having the same number of nodes and edges by chance?!
-        raise Exception(
-            "This function must be called on the incidence matrix, not the adjacency matrix"
+        # create a list of edges (numpy array of indices)
+        node_list_string = data.keys().tolist()
+        node_list = list(range(data_array.shape[1]))
+        edge_list = list(
+            itertools.chain(
+                *[itertools.combinations(node_list, ii) for ii in range(2, len(node_list))]
+            )
+        )
+        max_edge = np.max([len(ii) for ii in edge_list])
+        work_list = np.array(
+            [list(ii) + [-1] * (max_edge - len(ii)) for ii in edge_list],
+            dtype=np.int8
         )
 
-    # Check the incidence matrix is the right datatype
-    if incidence_matrix.dtype != np.uint8:
-        if verbose:
-            print("Converting incidence matrix type to u8")
-        incidence_matrix = incidence_matrix.astype(np.uint8)
-
-    # Check the weight vector is the right shape
-    if short_axis_size != len(weight):
-        raise Exception(
-            ("The weight vector and the second index of the "+
-             "incidence matrix must be the same length")
-        )
-
-    rng = np.random.default_rng(random_seed)
-
-    # 2) do the Chebyshev
+        # shuffle the work list to improve runtime
+        reindex = np.arange(work_list.shape[0])
+        np.random.shuffle(reindex)
+        work_list = work_list[reindex, :]
+        edge_list = np.array(edge_list)[reindex].tolist()
 
 
-    # Normalised random initial vector
-    if bipartite:
-        old_eigenvector_estimate = rng.random(long_axis_size + short_axis_size, dtype='float64')
-        incidence_matrix = np.dot(incidence_matrix.T, np.diag(weight)).T
-    else:
-        old_eigenvector_estimate = rng.random(long_axis_size, dtype='float64')
-    old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
+        # compute the weights
+        (inc_mat, edge_weight, node_weight) = _overlap_coefficient_numba(data_array, work_list)
+        # traverse the edge list again to create a list of string labels
+        edge_list_out = [tuple([node_list_string[jj] for jj in ii]) for ii in edge_list]
 
-    eigenvalue_estimates, eigenvalue_error_estimates = [], []
+        # get rid of rows that are all zero.
+        inds = edge_weight > 0
+        inc_mat = inc_mat[inds, :]
+        edge_weight = edge_weight[inds]
+        edge_list_out = np.array(edge_list_out)[inds].tolist()
 
-    # In principle, the body of this loop could be compiled with Numba.
-    # However, iterate_vector() is quadratic in long_axis_size, whereas
-    # all the other operations here are linear in it, so we are spend very
-    # little time in the rest of this loop body.
+        
+        self.incidence_matrix = inc_mat
+        self.edge_weights = edge_weight
+        self.node_weights = node_weight
+        self.edge_list = edge_list_out
+        self.node_list = node_list
+        return 
 
-    for iteration in range(max_iterations):
 
-        if verbose:
-            print("\rRunning iteration {}...".format(iteration), end="")
+    def eigenvector_centrality(
+            self,
+            #incidence_matrix,
+            #weight,
+            # TODO a flag for standard, dual or bipartite reps.
+            tolerance=1e-6,
+            max_iterations=100,
+            random_seed=12345,
+            bipartite=False,
+            verbose=False,
+        ):
 
+        """
+        This function uses a Chebyshev algorithm to find the eigenvector
+        and largest eigenvalue (corresponding to the eigenvector
+        centrality) from the incidence matrix and a weight vector.
+        Note, the adjacency matrix is calculated using M * W * C^T, so the
+        size of the first dimension of the incidence matrix will be the
+        length of the returned eigenvector
+
+        In jupyter, set the number of CPUs to use by executing
+        the following before the function call:
+        %env NUMBA_NUM_THREADS=n
+
+        One may use this function to compute the centrality of the standard,
+        the dual hypergraph or the bipartite represention of the hypergraph
+
+        Examples
+        --------
+
+        >>> eigenvector_centrality(inc_mat.T, edge_weight)
+        computes the eigenvector centrality of the standard hypergraph.
+
+        >>> eigenvector_centrality(inc_mat, node_weight)
+        computes the eigenvector centrality of the dual hypergraph.
+
+        >>> eigenvector_centrality(inc_mat, node_weight, bipartite=True)
+        computes the eigenvector centrality of the bipartite representation of the hypergraph.
+
+        Parameters
+        ----------
+            incidence_matrix : numpy.array
+                The incidence matrix (M) of the hypergraph. this is an n x m
+                matrix such that M^T * W * M is the adjacency matrix. Can use
+                the output of compute_hypergraph here
+
+            weight : numpy.array
+                A vector corresponding to the weights of the hypergraph. The length
+                of this vector must be equal to the length of the second axis
+                of the incidence matrix (since the adjacency matrix is calculated
+                as M^T * W * M). This function can be used with unweighted hypergraphs
+                by passing in an array of ones of the appropriate length.
+
+            tolerance : float, optional
+                The difference between iterations in the eigenvalue at which to
+                assume the algorithm has converged (default: 1e-6)
+
+            max_iterations : int, optional
+                The maximum number of iterations to perform before terminating the
+                algorithm and assuming it has not converged (default: 100)
+
+            random_seed : int, optional
+                The random seed to use in generating the initial vector (default: 12345)
+
+            bipartite : bool, optional
+                Whether or not to compute the eigenvector centrality of the bipartite representation
+                of the hypergraph. This allows one to compute a centrality for the nodes and edges
+                of the graph together. (default: False)
+
+            verbose : bool, optional
+                When this is set to true the function produces additional output to stdout
+                (default: False)
+
+        Returns
+        -------
+
+            float
+                The calculated largest eigenvalue of the adjacency matrix
+
+            float
+                The calculated error in the eigenvalue
+
+            numpy.array
+                the eigenvector centrality of the hypergraph. The order of the elements is
+                the same as the order passed in via the incidence matrix.
+
+        """
+        # 1) Check we don't have an adjacency matrix by checking the size of incidence matrix
+
+        long_axis_size, short_axis_size = np.shape(self.incidence_matrix)
+        if long_axis_size == short_axis_size:
+            # What's the probability of having the same number of nodes and edges by chance?!
+            raise Exception(
+                "This function must be called on the incidence matrix, not the adjacency matrix"
+            )
+
+        # Check the incidence matrix is the right datatype
+        if self.incidence_matrix.dtype != np.uint8:
+            if verbose:
+                print("Converting incidence matrix type to u8")
+            self.incidence_matrix = self.incidence_matrix.astype(np.uint8)
+
+        # Check the weight vector is the right shape
+        weight = self.node_weights
+        if short_axis_size != len(weight):
+            raise Exception(
+                ("The weight vector and the second index of the "+
+                 "incidence matrix must be the same length")
+            )
+
+        rng = np.random.default_rng(random_seed)
+
+        # 2) do the Chebyshev
+
+
+        # Normalised random initial vector
         if bipartite:
-            new_eigenvector_estimate = __iterate_vector_bipartite(
-                incidence_matrix,
-                old_eigenvector_estimate
-            )
+            old_eigenvector_estimate = rng.random(long_axis_size + short_axis_size, dtype='float64')
+            self.incidence_matrix = np.dot(self.incidence_matrix.T, np.diag(weight)).T
         else:
-            new_eigenvector_estimate = __iterate_vector(
-                incidence_matrix,
-                weight,
-                old_eigenvector_estimate
-            )
+            old_eigenvector_estimate = rng.random(long_axis_size, dtype='float64')
+        old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
 
+        eigenvalue_estimates, eigenvalue_error_estimates = [], []
 
-        # To estimate eigenvalue, take ratio of new to old eigenvector
-        # ignoring zeroes
-        mask = (new_eigenvector_estimate != 0) & (old_eigenvector_estimate != 0)
-        iter_eigenvalue_estimates = new_eigenvector_estimate[mask] / old_eigenvector_estimate[mask]
-        eigenvalue_estimate = iter_eigenvalue_estimates.mean()
-        eigenvalue_error_estimate = iter_eigenvalue_estimates.std()
+        # In principle, the body of this loop could be compiled with Numba.
+        # However, iterate_vector() is quadratic in long_axis_size, whereas
+        # all the other operations here are linear in it, so we are spend very
+        # little time in the rest of this loop body.
 
-        eigenvalue_estimates.append(eigenvalue_estimate)
-        eigenvalue_error_estimates.append(eigenvalue_error_estimate)
-
-        if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
+        for iteration in range(max_iterations):
 
             if verbose:
-                print(
-                    "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
-                        eigenvalue_estimate,
-                        eigenvalue_error_estimate,
-                        iteration
+                print("\rRunning iteration {}...".format(iteration), end="")
+
+            if bipartite:
+                new_eigenvector_estimate = _iterate_vector_bipartite(
+                    self.incidence_matrix,
+                    old_eigenvector_estimate
+                )
+            else:
+                new_eigenvector_estimate = _iterate_vector(
+                    self.incidence_matrix,
+                    weight,
+                    old_eigenvector_estimate
+                )
+
+
+            # To estimate eigenvalue, take ratio of new to old eigenvector
+            # ignoring zeroes
+            mask = (new_eigenvector_estimate != 0) & (old_eigenvector_estimate != 0)
+            iter_eigenvalue_estimates = new_eigenvector_estimate[mask] / old_eigenvector_estimate[mask]
+            eigenvalue_estimate = iter_eigenvalue_estimates.mean()
+            eigenvalue_error_estimate = iter_eigenvalue_estimates.std()
+
+            eigenvalue_estimates.append(eigenvalue_estimate)
+            eigenvalue_error_estimates.append(eigenvalue_error_estimate)
+
+            if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
+
+                if verbose:
+                    print(
+                        "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
+                            eigenvalue_estimate,
+                            eigenvalue_error_estimate,
+                            iteration
+                        )
                     )
-                )
-            break
+                break
 
-        # Normalise to try to prevent overflows
-        old_eigenvector_estimate = (
-            new_eigenvector_estimate /
-            np.linalg.norm(new_eigenvector_estimate)
-        )
-
-    else:
-        if verbose:
-            print("\nFailed to converge after", iteration, "iterations.")
-            print("Last estimate was {:.2f} ± {:.4f}".format(
-                eigenvalue_estimate,
-                eigenvalue_error_estimate
-                )
+            # Normalise to try to prevent overflows
+            old_eigenvector_estimate = (
+                new_eigenvector_estimate /
+                np.linalg.norm(new_eigenvector_estimate)
             )
 
-    if bipartite:
-        eigenvalue_estimate = eigenvalue_estimate - 1.0
+        else:
+            if verbose:
+                print("\nFailed to converge after", iteration, "iterations.")
+                print("Last estimate was {:.2f} ± {:.4f}".format(
+                    eigenvalue_estimate,
+                    eigenvalue_error_estimate
+                    )
+                )
 
-    return (
-        eigenvalue_estimate,
-        eigenvalue_error_estimate,
-        new_eigenvector_estimate
-    )
+        if bipartite:
+            eigenvalue_estimate = eigenvalue_estimate - 1.0
+
+        return (
+            eigenvalue_estimate,
+            eigenvalue_error_estimate,
+            new_eigenvector_estimate
+        )   
 
 
 if __name__ == "__main__":
 
     print("this is here for testing purposes only")
+    n_samples = 10
+    n_features = 15
+    data_np = (np.random.rand(n_samples, n_features) > 0.8).astype(np.uint8)
+    
+    import pandas as pd
+    data = pd.DataFrame(data_np).rename(columns={i:"disease_{}".format(i) for i in range(n_features)})
+    
+    h = Hypergraph()
+    h.compute_hypergraph(data)
+    
+    
+    print(h.incidence_matrix)
+    
+    
+    
