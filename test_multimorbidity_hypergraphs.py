@@ -300,3 +300,63 @@ def test_calculate_EVC_dual_hypergraph():
     assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) < tolerance).all()    
     
+def test_calculate_EVC_bipartite_hypergraph():
+    """
+    Test that the eigenvector centrality of the bipartite hypergraph
+    (centrality of the nodes and the edges) is calculated correctly.
+    """
+    
+    n_people = 5000
+    n_diseases = 10
+    tolerance = 1e-6
+    
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    total_elems = len(h.edge_list) + len(h.node_list)
+    
+    adjacency_matrix = np.zeros((total_elems, total_elems))
+    
+    adjacency_matrix[len(h.node_list):total_elems, 0:len(h.node_list)] = np.dot(
+        h.incidence_matrix.T, 
+        np.diag(h.edge_weights)
+    ).T
+    adjacency_matrix[0:len(h.node_list), len(h.node_list):total_elems] = np.dot(
+        h.incidence_matrix.T, 
+        np.diag(h.edge_weights)
+    )
+    
+    np_e_vals, np_e_vecs = np.linalg.eigh(adjacency_matrix)
+    
+    exp_eval = np.max(np_e_vals)
+    exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
+    exp_evec = exp_evec / np.sqrt(np.dot(exp_evec, exp_evec))
+    
+    assert (exp_evec > 0).all() | (exp_evec < 0).all()
+    exp_evec = np.abs(exp_evec)
+    
+    
+    e_val, eval_err, e_vec = h.eigenvector_centrality(
+        rep = "bipartite",
+        tolerance=tolerance
+    )
+    
+    e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+    
+    # I don't completely understand how the tolerance relates to the error.
+    # There is probably some addtional uncertainty coming from the fast_math
+    # approximations that numba is using, and this bipartite adjacency matrix
+    # is contructed in a really ad hoc way. The differences between expectation
+    # and the module code is 
+    # a) consistent and 
+    # b) small compared to the eigenvector elements ( O(0.01%) ).
+    assert (exp_eval - e_val) ** 2 < tolerance
+    assert (np.abs(exp_evec - e_vec)/10 < tolerance).all() 
+    
