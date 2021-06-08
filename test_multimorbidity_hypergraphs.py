@@ -198,6 +198,10 @@ def test_build_hypergraph_incidence_matrix():
     assert (exp_incidence_matrix == h.incidence_matrix).all()
     
 def test_calculate_EVC_standard_hypergraph():
+    """
+    Test that the eigenvector centrality of the standard hypergraph
+    (centrality of the nodes) is calculated correctly.
+    """
     
     n_people = 5000
     n_diseases = 10
@@ -243,8 +247,56 @@ def test_calculate_EVC_standard_hypergraph():
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
     
     # there is some numerical uncertainty in these calculations
-    assert np.abs(exp_eval - e_val) < tolerance
+    assert np.abs(exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
     
+def test_calculate_EVC_dual_hypergraph():
+    """
+    Test that the eigenvector centrality of the dual hypergraph
+    (centrality of the edges) is calculated correctly.
+    """
     
+    n_people = 5000
+    n_diseases = 10
+    tolerance = 1e-6
+    
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    adjacency_matrix = np.dot(
+        h.incidence_matrix,
+        np.dot(
+            np.diag(h.node_weights),
+            h.incidence_matrix.T
+        )
+    )
+    np.fill_diagonal(adjacency_matrix, 0.0)
+    np_e_vals, np_e_vecs = np.linalg.eigh(adjacency_matrix)
+    
+    exp_eval = np.max(np_e_vals)
+    exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
+    exp_evec = exp_evec / np.sqrt(np.dot(exp_evec, exp_evec))
+    
+    assert (exp_evec > 0).all() | (exp_evec < 0).all()
+    exp_evec = np.abs(exp_evec)
+    
+    
+    e_val, eval_err, e_vec = h.eigenvector_centrality(
+        rep = "dual",
+        tolerance=tolerance
+    )
+    
+    # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
+    e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+    
+    # there is some numerical uncertainty in these calculations
+    assert (exp_eval - e_val) ** 2 < tolerance
+    assert (np.abs(exp_evec - e_vec) < tolerance).all()    
     
