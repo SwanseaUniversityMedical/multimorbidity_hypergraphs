@@ -99,7 +99,7 @@ def _overlap_coefficient_numba(data, work_list):
         for row in range(data.shape[0]):
             if data[row, index] > 0:
                 numerator += 1.0
-        node_weight[index] = (numerator / np.float64(data.shape[0])) ** 2
+        node_weight[index] = (numerator / np.float64(data.shape[0]))
 
 
     return (incidence_matrix, edge_weight, node_weight)
@@ -333,20 +333,21 @@ class Hypergraph(object):
         # compute the weights
         (inc_mat, edge_weight, node_weight) = weight_function(data_array, work_list)
         # traverse the edge list again to create a list of string labels
-        edge_list_out = [tuple([node_list_string[jj] for jj in ii]) for ii in edge_list]
+        edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
         # get rid of rows that are all zero.
         inds = edge_weight > 0
         inc_mat = inc_mat[inds, :]
         edge_weight = edge_weight[inds]
         edge_list_out = np.array(edge_list_out)[inds].tolist()
-
+        # traverse the edge list one final time to make sure the edges are tuples
+        edge_list_out = [tuple(ii) for ii in edge_list_out]
         
         self.incidence_matrix = inc_mat
         self.edge_weights = edge_weight
         self.node_weights = node_weight
         self.edge_list = edge_list_out
-        self.node_list = node_list
+        self.node_list = node_list_string
         return 
 
 
@@ -440,7 +441,6 @@ class Hypergraph(object):
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
             weight = self.node_weights
         elif rep == "bipartite":
-            print(self.incidence_matrix.shape)
             old_eigenvector_estimate = rng.random(np.sum(self.incidence_matrix.shape), dtype='float64')
             inc_mat = np.dot(self.incidence_matrix.T, np.diag(self.edge_weights)).T
             
@@ -451,7 +451,7 @@ class Hypergraph(object):
         # not sure this is needd because both of these variables are coming from
         # internal state, but we'll keep it unless we end up with a reason to 
         # get rid of it. 
-        if rep != "bipartite" and short_axis_size != len(weight):
+        if rep != "bipartite" and inc_mat.shape[1] != len(weight):
             raise Exception(
                 ("The weight vector and the second index of the "+
                  "incidence matrix must be the same length")

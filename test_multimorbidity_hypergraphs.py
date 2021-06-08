@@ -1,0 +1,250 @@
+
+import multimorbidity_hypergraphs as hgt
+import numpy as np
+import pandas as pd
+
+import itertools
+
+def test_instantiated():
+    """
+    Tests the instantiation of the hypergraph object. 
+    
+    Pretty simple test as all internal state is set to None.
+    """
+
+
+    h = hgt.Hypergraph()
+    
+    assert h.incidence_matrix is None 
+    assert h.edge_weights is None 
+    assert h.node_weights is None 
+    assert h.edge_list is None 
+    assert h.node_list is None
+    
+
+def test_build_hypergraph_edge_weights():
+    """
+    Test the calculation of the edges weights in the construction of a 
+    hypergraph with a very simple dataset
+    
+    The expected edge weights have been calculated by hand and are stored in 
+    exp_edge_weights.
+    """
+
+
+    data = np.array([
+        [1, 0, 1, 0],
+        [0, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 1],
+        [1, 1, 1, 1]
+    ])
+    
+    exp_edge_weights = {
+        ('disease_0', 'disease_1'): 1/2, 
+        ('disease_0', 'disease_2'): 2/2, 
+        ('disease_1', 'disease_2'): 2/3,
+        ('disease_0', 'disease_3'): 1/2,
+        ('disease_1', 'disease_3'): 3/3,
+        ('disease_2', 'disease_3'): 2/3,
+        ('disease_0', 'disease_1', 'disease_2'): 1/2,
+        ('disease_0', 'disease_1', 'disease_3'): 1/2,
+        ('disease_0', 'disease_2', 'disease_3'): 1/2,
+        ('disease_1', 'disease_2', 'disease_3'): 2/3,
+    }
+    
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    # make sure there are the right number of sets / weights
+    assert len(h.edge_weights) == len(exp_edge_weights.values())
+    
+    # check each weight 
+    for k in exp_edge_weights:
+        assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
+
+def test_build_hypergraph_edge_weights_zero_sets():
+    """
+    Test that edges with zero weight are correctly discarded.
+    """
+
+    data = np.array([
+        [1, 0, 1],
+        [0, 1, 0],
+        [0, 1, 1],
+        [0, 1, 1]
+    ]) # there is no one with disease 0 and disease 1
+    
+    exp_edge_weights = {
+        ('disease_0', 'disease_1'): 0, 
+        ('disease_0', 'disease_2'): 1/1, 
+        ('disease_1', 'disease_2'): 2/3,
+    }
+
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    # zero weights are discarded. There is EXACTLY one zero weight in this system
+    assert len(h.edge_weights) + 1 == len(exp_edge_weights.values())
+    
+    # check each non-zero weight 
+    for k in exp_edge_weights:
+        if exp_edge_weights[k] > 0:
+            assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
+
+
+def test_build_hypergraph_node_weights():
+    """
+    Test that node weights (crude prevalence) are correctly calculated.
+    
+    The expected node weights have been calculated by hand and are stored in 
+    exp_node_weights.
+    """
+    
+    data = np.array([
+        [1, 0, 1, 0],
+        [0, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 1],
+        [1, 1, 1, 1]
+    ])
+    
+    exp_node_weights = {
+        'disease_0': 2/5, 
+        'disease_1': 4/5,
+        'disease_2': 3/5,
+        'disease_3': 3/5,
+    }
+    
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    for k in exp_node_weights:
+        # This rounding error is caused by fast_math being set to true in the 
+        # numba JIT decorator. 
+        assert np.abs(h.node_weights[h.node_list.index(k)] - exp_node_weights[k]) < 1e-15
+
+
+def test_build_hypergraph_incidence_matrix():
+    """
+    Test that incidence matrix is correctly calculated.
+    
+    The expected incidence matrix is stored in exp_incidence_matrix and needs 
+    to have it's rows reordered as the edge list is shuffled in h.compute_hypergraph()
+    to improve threading performance.
+    """
+
+    data = np.array([
+        [1, 0, 1, 0],
+        [0, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 1],
+        [1, 1, 1, 1]
+    ])
+    
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    exp_edge_list = [
+        ('disease_0', 'disease_1'), 
+        ('disease_0', 'disease_2'), 
+        ('disease_1', 'disease_2'),
+        ('disease_0', 'disease_3'),
+        ('disease_1', 'disease_3'),
+        ('disease_2', 'disease_3'),
+        ('disease_0', 'disease_1', 'disease_2'),
+        ('disease_0', 'disease_1', 'disease_3'),
+        ('disease_0', 'disease_2', 'disease_3'),
+        ('disease_1', 'disease_2', 'disease_3'),
+    ]
+    
+    exp_incidence_matrix = np.array([
+        [1, 1, 0, 0],
+        [1, 0, 1, 0],
+        [0, 1, 1, 0],
+        [1, 0, 0, 1],
+        [0, 1, 0, 1],
+        [0, 0, 1, 1],
+        [1, 1, 1, 0],
+        [1, 1, 0, 1],
+        [1, 0, 1, 1],
+        [0, 1, 1, 1],
+    ])
+    
+    # the edge list is randomly shuffled for threading.
+    inds = [exp_edge_list.index(k) for k in h.edge_list]
+    exp_incidence_matrix = exp_incidence_matrix[inds, :]
+    
+    assert (exp_incidence_matrix == h.incidence_matrix).all()
+    
+def test_calculate_EVC_standard_hypergraph():
+    
+    n_people = 5000
+    n_diseases = 10
+    tolerance = 1e-6
+    
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i:"disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    
+    # calculate the adjacency matrix from the incidence matrix and weights 
+    # computed by h.compute_hypergraph() tested above.
+    
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    adjacency_matrix = np.dot(
+        h.incidence_matrix.T,
+        np.dot(
+            np.diag(h.edge_weights),
+            h.incidence_matrix
+        )
+    )
+    np.fill_diagonal(adjacency_matrix, 0.0)
+    np_e_vals, np_e_vecs = np.linalg.eigh(adjacency_matrix)
+    
+    exp_eval = np.max(np_e_vals)
+    exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
+    exp_evec = exp_evec / np.sqrt(np.dot(exp_evec, exp_evec))
+    
+    # The expected eigenvector can sometimes be all negative elements, for 
+    # what I assume are numerical reasons. They should always be either all 
+    # positive or all negative (i.e. up to an overal scaling of -1).
+    assert (exp_evec > 0).all() | (exp_evec < 0).all()
+    exp_evec = np.abs(exp_evec)
+    
+    
+    e_val, eval_err, e_vec = h.eigenvector_centrality(tolerance=tolerance)
+    
+    # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
+    e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+    
+    # there is some numerical uncertainty in these calculations
+    assert np.abs(exp_eval - e_val) < tolerance
+    assert (np.abs(exp_evec - e_vec) < tolerance).all()
+    
+    
+    
