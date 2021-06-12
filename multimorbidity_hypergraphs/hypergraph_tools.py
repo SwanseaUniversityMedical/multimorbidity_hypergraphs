@@ -32,13 +32,13 @@ def _number_in_array(
 
 @numba.jit(
         numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:])) # outputs
-        (numba.uint8[:, :], numba.int8[:, :]), # inputs
+        (numba.uint8[:, :], numba.int8[:, :], numba.boolean), # inputs
     nopython=True,
     nogil=True,
     parallel=True,
     fastmath=True,
 )
-def _overlap_coefficient_numba(data, work_list):
+def _overlap_coefficient_numba(data, work_list, do_apriori):
     """
     This function takes a data table and computes the overlap
     coefficient for all combinations spectified in the work list.
@@ -115,19 +115,18 @@ def _overlap_coefficient_numba(data, work_list):
 
         # check if the numerator is zero and then remove all sets 
         # containing the diseases in the zero set from the work list.
-        
-        if numerator == 0:
+        if numerator == 0 and do_apriori:
             
             drop_inds = []
-            for drop_work_index in range(len(indices)):
+            #print(len(indices))
+            for drop_work_index in numba.prange(len(indices)):
                 
                 inds_check = work_list[drop_work_index, :]
                 inds_check = inds_check[inds_check != -1]
                 
                 drop = True
                 for node_check in inds:
-                    if not(_number_in_array(node_check, inds_check)): 
-                    # not((inds_check == node_check).any()):
+                    if not(_number_in_array(node_check, inds_check)):
                         drop = False
                         break 
                 if drop and (len(inds) != len(inds_check)):
@@ -295,7 +294,8 @@ class Hypergraph(object):
     def compute_hypergraph(
         self, 
         data,
-        weight_function = _overlap_coefficient_numba
+        weight_function = _overlap_coefficient_numba,
+        do_apriori = False
     ):
         """
         Compute the incidence matrix and weights of a weighted, undirected hypergraph.
@@ -382,7 +382,7 @@ class Hypergraph(object):
 
 
         # compute the weights
-        (inc_mat, edge_weight, node_weight) = weight_function(data_array, work_list)
+        (inc_mat, edge_weight, node_weight) = weight_function(data_array, work_list, do_apriori)
         # traverse the edge list again to create a list of string labels
         edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
@@ -617,16 +617,24 @@ if __name__ == "__main__":
 
     print("this is here for testing purposes only")
     n_samples = 5000
-    n_features = 10#20
+    n_features = 20
     data_np = (np.random.rand(n_samples, n_features) > 0.8).astype(np.uint8)
     
     import pandas as pd
+    from time import time
+    
     data = pd.DataFrame(data_np).rename(columns={i:"disease_{}".format(i) for i in range(n_features)})
     
+    t = time()
     h = Hypergraph()
     h.compute_hypergraph(data)
-    print(h.incidence_matrix.shape)
+    print(time() - t)
+    #print(h.incidence_matrix.shape)
     
+    t = time()
+    g = Hypergraph()
+    g.compute_hypergraph(data, do_apriori=True)
+    print(time() - t)
     
     #e_val, e_val_err, e_vec = h.eigenvector_centrality(rep="bipartite")
     #print(e_vec.shape)
