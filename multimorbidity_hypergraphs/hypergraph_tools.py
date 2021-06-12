@@ -13,6 +13,23 @@ import numba
 ##########################################
 ## Numba compiled functions here 
 
+
+
+@numba.jit(
+        numba.boolean
+        (numba.int8, numba.int8[:]),
+    nopython=True,
+    nogil=True
+)
+def _number_in_array(
+    number,
+    array
+):
+    for i in range(len(array)):
+        if number == array[i]:
+            return True
+    return False 
+
 @numba.jit(
         numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:])) # outputs
         (numba.uint8[:, :], numba.int8[:, :]), # inputs
@@ -61,11 +78,20 @@ def _overlap_coefficient_numba(data, work_list):
             that contains the calculated node weights.
     """
 
-    incidence_matrix = np.zeros(shape=(work_list.shape[0], work_list.shape[1] + 1), dtype=np.uint8)
-    edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
+    loop_max = work_list.shape[0]
 
-    for index in numba.prange(work_list.shape[0]):
+    incidence_matrix = np.zeros(shape=(loop_max, work_list.shape[1] + 1), dtype=np.uint8)
+    edge_weight = np.zeros(shape=loop_max, dtype=np.float64)
+    
+    indices = list(range(loop_max))
 
+    for work_index in numba.prange(loop_max):
+
+        try:
+            index = indices[work_index]
+        except:
+            continue 
+        
         inds = work_list[index, :]
         inds = inds[inds != -1]
         n_diseases = inds.shape[0]
@@ -87,6 +113,31 @@ def _overlap_coefficient_numba(data, work_list):
             if denominator[jj] < denom:
                 denom = denominator[jj]
 
+        # check if the numerator is zero and then remove all sets 
+        # containing the diseases in the zero set from the work list.
+        
+        if numerator == 0:
+            
+            drop_inds = []
+            for drop_work_index in range(len(indices)):
+                
+                inds_check = work_list[drop_work_index, :]
+                inds_check = inds_check[inds_check != -1]
+                
+                drop = True
+                for node_check in inds:
+                    if not(_number_in_array(node_check, inds_check)): 
+                    # not((inds_check == node_check).any()):
+                        drop = False
+                        break 
+                if drop and (len(inds) != len(inds_check)):
+                    drop_inds.append(drop_work_index)
+                   
+            # reverse sort because the inds above the deleted index 
+            # get reduced by one after the deletion.
+            for drop_work_index in sorted(drop_inds, reverse=True):
+                del indices[drop_work_index]
+            
         weight = numerator / denom
         edge_weight[index] = weight
         for jj in range(n_diseases):
@@ -565,18 +616,19 @@ def unweighted_hypergraph_fn(data, work_list):
 if __name__ == "__main__":
 
     print("this is here for testing purposes only")
-    n_samples = 10
-    n_features = 15
+    n_samples = 5000
+    n_features = 10#20
     data_np = (np.random.rand(n_samples, n_features) > 0.8).astype(np.uint8)
     
     import pandas as pd
     data = pd.DataFrame(data_np).rename(columns={i:"disease_{}".format(i) for i in range(n_features)})
     
     h = Hypergraph()
-    h.compute_hypergraph(data, weight_function=unweighted_hypergraph_fn)
-    
+    h.compute_hypergraph(data)
     print(h.incidence_matrix.shape)
-    e_val, e_val_err, e_vec = h.eigenvector_centrality(rep="bipartite")
-    print(e_vec.shape)
+    
+    
+    #e_val, e_val_err, e_vec = h.eigenvector_centrality(rep="bipartite")
+    #print(e_vec.shape)
     
     
