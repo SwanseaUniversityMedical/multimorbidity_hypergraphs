@@ -35,7 +35,7 @@ def _number_in_array(
     nopython=True,
     nogil=True,
     parallel=True,
-    fastmath=False,
+    fastmath=True,
 )
 def _overlap_coefficient_numba(data, work_list, do_apriori):
     """
@@ -106,20 +106,21 @@ def _overlap_coefficient_numba(data, work_list, do_apriori):
                         break 
         else:
             run_edge = True
+        
         if run_edge:
-                
+        
             inds = inds[inds >= 0]
             n_diseases = inds.shape[0]
-
+            
             numerator = 0.0
             denominator = np.zeros(shape=(n_diseases))
 
-            for ii in range(n_diseases):
+            for ii in range(data.shape[0]):
                 loop_sum = 0
                 for jj in range(n_diseases):
                     loop_sum += data[ii, inds[jj]]
                     denominator[jj] += data[ii, inds[jj]]
-
+                    
                 if loop_sum == n_diseases:
                     numerator += 1.0
 
