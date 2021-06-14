@@ -562,21 +562,3 @@ def unweighted_hypergraph_fn(data, work_list):
     return (incidence_matrix, edge_weight, node_weight)
         
 
-if __name__ == "__main__":
-
-    print("this is here for testing purposes only")
-    n_samples = 10
-    n_features = 15
-    data_np = (np.random.rand(n_samples, n_features) > 0.8).astype(np.uint8)
-    
-    import pandas as pd
-    data = pd.DataFrame(data_np).rename(columns={i:"disease_{}".format(i) for i in range(n_features)})
-    
-    h = Hypergraph()
-    h.compute_hypergraph(data, weight_function=unweighted_hypergraph_fn)
-    
-    print(h.incidence_matrix.shape)
-    e_val, e_val_err, e_vec = h.eigenvector_centrality(rep="bipartite")
-    print(e_vec.shape)
-    
-    
