@@ -1,0 +1,8 @@
+name: multimorbidity_hypergraphs
+channels:
+  - defaults
+dependencies:
+  - numba
+  - numpy
+  - itertools
+  - pytest
