@@ -4,5 +4,4 @@ channels:
 dependencies:
   - numba
   - numpy
-  - itertools
   - pytest
