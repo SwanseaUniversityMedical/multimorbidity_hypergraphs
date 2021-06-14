@@ -1,5 +1,7 @@
 # Hypergraphs for Multimorbidity Research
 
+[![Tests](https://github.com/jim-rafferty/multimorbidity_hypergraphs/actions/workflows/python-package-conda.yml/badge.svg)](https://github.com/jim-rafferty/multimorbidity_hypergraphs/actions/workflows/python-package-conda.yml)
+
 This is a collection of tools for constructing and analysing hypergraphs from 
 data. Hypergraphs are very general and powerful objects for data analysis which 
 connect nodes and edges. As for binary graphs, nodes can conect to any number of 
