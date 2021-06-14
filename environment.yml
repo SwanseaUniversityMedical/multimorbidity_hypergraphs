@@ -2,7 +2,7 @@ name: multimorbidity_hypergraphs
 channels:
   - defaults
 dependencies:
-  - numba
-  - numpy
+  - numba>=0.48
+  - numpy>=1.18
   - pandas
   - pytest
