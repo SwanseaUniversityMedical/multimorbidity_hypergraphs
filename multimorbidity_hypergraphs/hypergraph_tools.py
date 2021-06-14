@@ -20,7 +20,7 @@ import numba
     nopython=True,
     nogil=True,
     parallel=True,
-    fastmath=True,
+    fastmath=False,
 )
 def _overlap_coefficient_numba(data, work_list):
     """
@@ -62,9 +62,23 @@ def _overlap_coefficient_numba(data, work_list):
             that contains the calculated node weights.
     """
 
+    
     incidence_matrix = np.zeros(shape=(work_list.shape[0], work_list.shape[1] + 1), dtype=np.uint8)
     edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
 
+    # NOTE (Jim 14/6/2021)
+    # There is an absolutely bizarre bug in Numba 0.53.1
+    # (already reported: https://github.com/numba/numba/issues/7105) 
+    # In nopython, parallel=True JIT mode, unless I print some feature
+    # of the work list variable the loop starting on line 82 will do
+    # nothing. self.edge_weights will be empty and most of the tests in
+    # the test suite will fail. The only reasonable response here is to 
+    # say "what the fuck?!"
+    print("Computing ", work_list.shape[0], " edges")
+    # Also, if I put this print statement above the intialisation of the 
+    # incidence matrix and edge weight vector the tests fail again.
+    # *shakes head. Numba is broken.
+    
     for index in numba.prange(work_list.shape[0]):
 
         inds = work_list[index, :]
