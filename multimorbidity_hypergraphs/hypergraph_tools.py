@@ -339,8 +339,9 @@ class Hypergraph(object):
         # shuffle the work list to improve runtime
         reindex = np.arange(work_list.shape[0])
         np.random.shuffle(reindex)
-        work_list = work_list[reindex, :]
-        edge_list = np.array(edge_list)[reindex].tolist()
+        work_list = work_list[reindex, :] 
+        print(edge_list)
+        edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
         (inc_mat, edge_weight, node_weight) = weight_function(data_array, work_list)
@@ -351,7 +352,7 @@ class Hypergraph(object):
         inds = edge_weight > 0
         inc_mat = inc_mat[inds, :]
         edge_weight = edge_weight[inds]
-        edge_list_out = np.array(edge_list_out)[inds].tolist()
+        edge_list_out = np.array(edge_list_out, dtype="object")[inds].tolist()
         # traverse the edge list one final time to make sure the edges are tuples
         edge_list_out = [tuple(ii) for ii in edge_list_out]
 
