@@ -14,27 +14,12 @@ import numba
 ## Numba compiled functions here 
 
 
-
-@numba.jit(
-    nopython=True,
-    nogil=True
-)
-def _number_in_array(
-    number,
-    array
-):
-    for i in range(len(array)):
-        if number == array[i]:
-            return True
-    return False 
-
-
 @numba.jit(
         numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:])) # outputs
         (numba.uint8[:, :], numba.int8[:, :], numba.boolean), # inputs
     nopython=True,
     nogil=True,
-    parallel=True,
+    parallel=False,
     fastmath=True,
 )
 def _overlap_coefficient_numba(data, work_list, do_apriori):
@@ -85,29 +70,22 @@ def _overlap_coefficient_numba(data, work_list, do_apriori):
     nodes = list(range(n_nodes))
     
     indices = list(range(loop_max))
-    discard_edges = []
-    
-    for work_index in numba.prange(loop_max):
-
-        try:
-            index = indices[work_index]
-        except:
-            continue 
-        
-        
+    discard_edges = np.array([-1], dtype=np.int64)
+    counter = 0
+    for index in numba.prange(loop_max):
+  
         inds = work_list[index, :]
         
+        run_edge = True
         if do_apriori:
-            run_edge = False  
-            for edge_check in range(len(discard_edges)):
-                for a, b in zip(inds, discard_edges[edge_check]):
-                    if a != b:
-                        run_edge = True
-                        break 
-        else:
-            run_edge = True
+        
+            for dead_index in discard_edges:
+                if index == dead_index:
+                    run_edge = False 
+                    break
         
         if run_edge:
+            counter += 1
         
             inds = inds[inds >= 0]
             n_diseases = inds.shape[0]
@@ -131,27 +109,28 @@ def _overlap_coefficient_numba(data, work_list, do_apriori):
 
             # check if the numerator is zero and then remove all sets 
             # containing the diseases in the zero set from the work list.
-            if numerator == 0 and do_apriori:
+            if numerator < 1 and do_apriori:
                 
-                #drop_inds = []
                 # this is required because of some numba oddness. 
                 base_set = [inds[wtf] for wtf in range(n_diseases)]
-                #print(n_diseases, base_set, len(base_set))
-                for n in nodes:
-                    if not(_number_in_array(n, base_set)):
-                        discard_edges.append(sorted(base_set + [n]) + [-1] * (n_nodes - n_diseases - 2))
                         
-                #print()
-                       
-                # reverse sort because the inds above the deleted index 
-                # get reduced by one after the deletion.
-                #for drop_work_index in sorted(drop_inds, reverse=True):
-                #    del indices[drop_work_index]
+                for edge_test in range(index + 1, loop_max):
+                    found_edge = True 
+                    for (a, b) in zip(base_set, work_list[edge_test, :]):
+                        if a != b:
+                            found_edge = False
+                            break 
+                            
+                    if found_edge:
+                        discard_edges = np.append(discard_edges, edge_test)
+
                 
             weight = numerator / denom
             edge_weight[index] = weight
             for jj in range(n_diseases):
                 incidence_matrix[index, inds[jj]] = 1
+
+    print(do_apriori, counter, len(discard_edges))
 
     node_weight = np.zeros(shape=data.shape[1], dtype=np.float64)
 
@@ -307,7 +286,7 @@ class Hypergraph(object):
         self, 
         data,
         weight_function = _overlap_coefficient_numba,
-        do_apriori = False
+        do_apriori = True
     ):
         """
         Compute the incidence matrix and weights of a weighted, undirected hypergraph.
@@ -387,10 +366,10 @@ class Hypergraph(object):
         )
 
         # shuffle the work list to improve runtime
-        reindex = np.arange(work_list.shape[0])
-        np.random.shuffle(reindex)
-        work_list = work_list[reindex, :]
-        edge_list = np.array(edge_list)[reindex].tolist()
+        #reindex = np.arange(work_list.shape[0])
+        #np.random.shuffle(reindex)
+        #work_list = work_list[reindex, :]
+        #edge_list = np.array(edge_list)[reindex].tolist()
 
 
         # compute the weights
@@ -630,18 +609,20 @@ if __name__ == "__main__":
     print("this is here for testing purposes only")
     n_samples = 5000
     n_features = 18
-    data_np = (np.random.rand(n_samples, n_features) > 0.8).astype(np.uint8)
+    data_np = (np.random.rand(n_samples, n_features) > 0.9).astype(np.uint8)
     
     import pandas as pd
     from time import time
+    import gc 
     
     data = pd.DataFrame(data_np).rename(columns={i:"disease_{}".format(i) for i in range(n_features)})
     
     t = time()
     h = Hypergraph()
-    h.compute_hypergraph(data)
+    h.compute_hypergraph(data, do_apriori=False)
     print(time() - t)
-    #print(h.incidence_matrix.shape)
+    del h
+    gc.collect()
     
     t = time()
     g = Hypergraph()
