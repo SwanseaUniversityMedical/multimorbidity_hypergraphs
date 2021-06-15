@@ -13,6 +13,37 @@ import numba
 ##########################################
 ## Numba compiled functions here
 
+@numba.jit(
+        numba.float64
+        (numba.uint8[:, :], numba.int8[:]),
+    nopython=True,
+    nogil=True,
+    fastmath=True,
+)
+def _overlap_coefficient(data, inds):
+    """
+    This function calculates the overlap coefficient for a dataset
+    and a single set of diseases.
+    """
+    n_diseases = inds.shape[0]
+    numerator = 0.0
+    denominator = np.zeros(shape=(n_diseases))
+
+    for ii in range(data.shape[0]):
+        loop_sum = 0
+        for jj in range(n_diseases):
+            loop_sum += data[ii, inds[jj]]
+            denominator[jj] += data[ii, inds[jj]]
+
+        if loop_sum == n_diseases:
+            numerator += 1.0
+
+    denom = denominator[0]
+    for jj in range(1, n_diseases):
+        if denominator[jj] < denom:
+            denom = denominator[jj]
+
+    return numerator / denom  
 
 @numba.jit(
         numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:]))  # outputs
@@ -20,9 +51,9 @@ import numba
     nopython=True,
     nogil=True,
     parallel=True,
-    fastmath=False,
+    fastmath=True,
 )
-def _overlap_coefficient_numba(data, work_list):
+def _compute_weights(data, work_list):
     """
     This function takes a data table and computes the overlap
     coefficient for all combinations spectified in the work list.
@@ -84,25 +115,9 @@ def _overlap_coefficient_numba(data, work_list):
         inds = work_list[index, :]
         inds = inds[inds != -1]
         n_diseases = inds.shape[0]
-
-        numerator = 0.0
-        denominator = np.zeros(shape=(n_diseases))
-
-        for ii in range(data.shape[0]):
-            loop_sum = 0
-            for jj in range(n_diseases):
-                loop_sum += data[ii, inds[jj]]
-                denominator[jj] += data[ii, inds[jj]]
-
-            if loop_sum == n_diseases:
-                numerator += 1.0
-
-        denom = denominator[0]
-        for jj in range(1, n_diseases):
-            if denominator[jj] < denom:
-                denom = denominator[jj]
-
-        weight = numerator / denom
+        
+        weight = _overlap_coefficient(data, inds)
+        
         edge_weight[index] = weight
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
@@ -257,7 +272,7 @@ class Hypergraph(object):
     def compute_hypergraph(
         self,
         data,
-        weight_function=_overlap_coefficient_numba
+        #weight_function=_compute_weights,  # temporarily disabled
     ):
         """
         Compute the incidence matrix and weights of a weighted, undirected hypergraph.
@@ -344,7 +359,7 @@ class Hypergraph(object):
         edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
-        (inc_mat, edge_weight, node_weight) = weight_function(data_array, work_list)
+        (inc_mat, edge_weight, node_weight) = _compute_weights(data_array, work_list)
         # traverse the edge list again to create a list of string labels
         edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
