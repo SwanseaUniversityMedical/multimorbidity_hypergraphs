@@ -6,3 +6,4 @@ dependencies:
   - numpy>=1.18
   - pandas
   - pytest
+  - pytest-benchmark

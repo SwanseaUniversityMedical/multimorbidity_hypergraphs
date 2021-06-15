@@ -357,3 +357,42 @@ def test_calculate_EVC_bipartite_hypergraph():
     # b) small compared to the eigenvector elements ( O(0.01%) ).
     assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) ** 2 < tolerance).all()
+
+
+def test_benchmarking_compute_hypergraph(benchmark):
+
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    benchmark(
+        h.compute_hypergraph,
+        data_pd
+    )
+
+
+def test_benchmarking_eigenvector_centrality(benchmark):
+
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    
+    benchmark(
+        h.eigenvector_centrality
+    )
