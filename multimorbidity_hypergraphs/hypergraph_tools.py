@@ -24,6 +24,30 @@ def _overlap_coefficient(data, inds):
     """
     This function calculates the overlap coefficient for a dataset
     and a single set of diseases.
+    
+    Note, the user may provide their own weighting function to use
+    in the compute_hypergraph method, and may use this as a template
+    as the type has to match the type of this function.
+    
+    Parameters
+    ----------
+    
+        data : numpy.array(dtype=numpy.uint8)
+            a table indicating whether an individual (rows) is present
+            in a node or not (columns).
+
+        inds : numpy.array(dtype=numpy.int8)
+            a vector specifying the edge (sets of nodes) to compute the
+            overlap coefficient for. Since this is a numba function that is
+            JIT compiled for performance, this is a numpy array. The 
+            edges is encoded as lists of integer indices representing 
+            nodes connected to the edge.
+            
+    Returns
+    -------
+    
+        numpy.float64 : The calculated overlap coefficient.
+    
     """
     n_diseases = inds.shape[0]
     numerator = 0.0
@@ -43,17 +67,21 @@ def _overlap_coefficient(data, inds):
         if denominator[jj] < denom:
             denom = denominator[jj]
 
-    return numerator / denom  
+    return numerator / denom
 
 @numba.jit(
         numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:]))  # outputs
-        (numba.uint8[:, :], numba.int8[:, :]),  # inputs
+        (numba.uint8[:, :], numba.int8[:, :], numba.typeof(_overlap_coefficient)),  # inputs
     nopython=True,
     nogil=True,
     parallel=True,
     fastmath=True,
 )
-def _compute_weights(data, work_list):
+def _compute_weights(
+    data,
+    work_list,
+    weight_function
+):
     """
     This function takes a data table and computes the overlap
     coefficient for all combinations spectified in the work list.
@@ -93,31 +121,31 @@ def _compute_weights(data, work_list):
             that contains the calculated node weights.
     """
 
-    
+
     incidence_matrix = np.zeros(shape=(work_list.shape[0], work_list.shape[1] + 1), dtype=np.uint8)
     edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
 
     # NOTE (Jim 14/6/2021)
     # There is an absolutely bizarre bug in Numba 0.53.1
-    # (already reported: https://github.com/numba/numba/issues/7105) 
+    # (already reported: https://github.com/numba/numba/issues/7105)
     # In nopython, parallel=True JIT mode, unless I print some feature
     # of the work list variable the loop starting on line 82 will do
     # nothing. self.edge_weights will be empty and most of the tests in
-    # the test suite will fail. The only reasonable response here is to 
+    # the test suite will fail. The only reasonable response here is to
     # say "what the fuck?!"
     print("Computing ", work_list.shape[0], " edges")
-    # Also, if I put this print statement above the intialisation of the 
+    # Also, if I put this print statement above the intialisation of the
     # incidence matrix and edge weight vector the tests fail again.
     # *shakes head. Numba is broken.
-    
+
     for index in numba.prange(work_list.shape[0]):
 
         inds = work_list[index, :]
         inds = inds[inds != -1]
         n_diseases = inds.shape[0]
-        
-        weight = _overlap_coefficient(data, inds)
-        
+
+        weight = weight_function(data, inds)
+
         edge_weight[index] = weight
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
@@ -272,7 +300,7 @@ class Hypergraph(object):
     def compute_hypergraph(
         self,
         data,
-        #weight_function=_compute_weights,  # temporarily disabled
+        weight_function=_overlap_coefficient,
     ):
         """
         Compute the incidence matrix and weights of a weighted, undirected hypergraph.
@@ -286,6 +314,7 @@ class Hypergraph(object):
 
         Parameters
         ----------
+        
             data : pandas.DataFrame
                 A pandas dataframe with rows corresponding to individuals
                 and columns to diseases. Entries of the dataframe should be zero
@@ -293,13 +322,12 @@ class Hypergraph(object):
                 respectively.
 
             weight_function : callable, optional
-                A function that computes the hypergraph weights. This must be a
-                callable function that takes two arguments (a numpy array of
-                data and a list of edges to compute weights for) and returns the
-                incidence_matrix (a 2d numpy array), the edge weights (a 1d numpy
-                array) and the node weights (also a 1d numpy array). By default,
-                a numba compile function calculates the overlap coefficient as the
-                edge weights and the crude prevalence as the node weight.
+                A numba comiled function that computes the hypergraph weights. This 
+                must be a function that takes two arguments (a numpy array of
+                data and a vector representing an edge to compute the weight for) 
+                and that returns the single edge weight (a numpy.float64).
+                By default, a numba compiled function calculating the overlap 
+                coefficient as the edge weights is used.
 
         Sets
         ----
@@ -354,12 +382,11 @@ class Hypergraph(object):
         # shuffle the work list to improve runtime
         reindex = np.arange(work_list.shape[0])
         np.random.shuffle(reindex)
-        work_list = work_list[reindex, :] 
-        print(edge_list)
+        work_list = work_list[reindex, :]
         edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
-        (inc_mat, edge_weight, node_weight) = _compute_weights(data_array, work_list)
+        (inc_mat, edge_weight, node_weight) = _compute_weights(data_array, work_list, weight_function)
         # traverse the edge list again to create a list of string labels
         edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
@@ -586,3 +613,7 @@ def unweighted_hypergraph_fn(data, work_list):
 
     return (incidence_matrix, edge_weight, node_weight)
 
+if __name__ == "__main__":
+
+
+    print(numba.typeof(_overlap_coefficient))
