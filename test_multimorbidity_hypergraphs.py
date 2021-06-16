@@ -2,7 +2,7 @@
 import multimorbidity_hypergraphs as hgt
 import numpy as np
 import pandas as pd
-
+import numba 
 
 def test_instantiated():
     """
@@ -357,6 +357,40 @@ def test_calculate_EVC_bipartite_hypergraph():
     # b) small compared to the eigenvector elements ( O(0.01%) ).
     assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) ** 2 < tolerance).all()
+
+
+def test_non_standard_weight_function():
+
+    @numba.jit(
+            numba.float64
+            (numba.uint8[:, :], numba.int8[:]),
+        nopython=True,
+        nogil=True,
+        fastmath=True,
+    )
+    def unit_weights(data, inds):
+        """
+        This function returns a 1.0 for each edge, essentially creating an
+        unweighted hypergraph. 
+        """
+        
+        return 1.0
+    
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd, weight_function=unit_weights)
+    
+    assert len(h.edge_weights) == 1012
+    assert (h.edge_weights == 1).all()
 
 
 def test_benchmarking_compute_hypergraph(benchmark):

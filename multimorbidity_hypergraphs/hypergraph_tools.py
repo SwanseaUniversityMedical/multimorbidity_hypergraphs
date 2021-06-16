@@ -70,8 +70,8 @@ def _overlap_coefficient(data, inds):
     return numerator / denom
 
 @numba.jit(
-        numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:]))  # outputs
-        (numba.uint8[:, :], numba.int8[:, :], numba.typeof(_overlap_coefficient)),  # inputs
+    #    numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:]))  # outputs
+    #    (numba.uint8[:, :], numba.int8[:, :], numba.typeof(_overlap_coefficient)),  # inputs
     nopython=True,
     nogil=True,
     parallel=True,
