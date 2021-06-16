@@ -2,7 +2,7 @@
 import multimorbidity_hypergraphs as hgt
 import numpy as np
 import pandas as pd
-import numba 
+import numba
 
 def test_instantiated():
     """
@@ -362,8 +362,6 @@ def test_calculate_EVC_bipartite_hypergraph():
 def test_non_standard_weight_function():
 
     @numba.jit(
-            numba.float64
-            (numba.uint8[:, :], numba.int8[:]),
         nopython=True,
         nogil=True,
         fastmath=True,
@@ -371,11 +369,11 @@ def test_non_standard_weight_function():
     def unit_weights(data, inds):
         """
         This function returns a 1.0 for each edge, essentially creating an
-        unweighted hypergraph. 
+        unweighted hypergraph.
         """
-        
+
         return 1.0
-    
+
     n_people = 5000
     n_diseases = 10
 
@@ -388,9 +386,41 @@ def test_non_standard_weight_function():
 
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd, weight_function=unit_weights)
-    
+
     assert len(h.edge_weights) == 1012
     assert (h.edge_weights == 1).all()
+
+
+def test_non_standard_weight_function_with_optional_arguments():
+
+    @numba.jit(
+        nopython=True,
+        nogil=True,
+        fastmath=True,
+    )
+    def unit_weights(data, inds, *args):
+        """
+        This function returns a 1.0 divided by a number passed in as an optional
+        argument.
+        """
+        print(args[0])
+        return 1.0 / args[0]
+
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd, unit_weights, 2.0)
+
+    assert len(h.edge_weights) == 1012
+    assert (h.edge_weights == 1/2).all()
 
 
 def test_benchmarking_compute_hypergraph(benchmark):
@@ -426,7 +456,7 @@ def test_benchmarking_eigenvector_centrality(benchmark):
 
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
-    
+
     benchmark(
         h.eigenvector_centrality
     )

@@ -14,13 +14,13 @@ import numba
 ## Numba compiled functions here
 
 @numba.jit(
-        numba.float64
-        (numba.uint8[:, :], numba.int8[:]),
+        #numba.float64
+        #(numba.uint8[:, :], numba.int8[:], numba.types.Tuple(())),
     nopython=True,
     nogil=True,
     fastmath=True,
 )
-def _overlap_coefficient(data, inds):
+def _overlap_coefficient(data, inds, *args):
     """
     This function calculates the overlap coefficient for a dataset
     and a single set of diseases.
@@ -70,8 +70,6 @@ def _overlap_coefficient(data, inds):
     return numerator / denom
 
 @numba.jit(
-    #    numba.types.Tuple((numba.uint8[:, :], numba.float64[:], numba.float64[:]))  # outputs
-    #    (numba.uint8[:, :], numba.int8[:, :], numba.typeof(_overlap_coefficient)),  # inputs
     nopython=True,
     nogil=True,
     parallel=True,
@@ -80,7 +78,8 @@ def _overlap_coefficient(data, inds):
 def _compute_weights(
     data,
     work_list,
-    weight_function
+    weight_function,
+    args,
 ):
     """
     This function takes a data table and computes the overlap
@@ -102,6 +101,13 @@ def _compute_weights(
             indices representing nodes connected to the edge. When the end
             of the edge is reached, the row is filled to the end with
             -1 (since edges can connect to any number of nodes).
+        
+        weight_function : callable, jit compiled function 
+            a function that takes the data and a vector representing an edge 
+            and returns a weight. 
+            
+        *args : optional 
+            optional data to pass to a custom weight function
 
     Returns
     -------
@@ -137,15 +143,18 @@ def _compute_weights(
     # Also, if I put this print statement above the intialisation of the
     # incidence matrix and edge weight vector the tests fail again.
     # *shakes head. Numba is broken.
-
+    
     for index in numba.prange(work_list.shape[0]):
 
         inds = work_list[index, :]
         inds = inds[inds != -1]
         n_diseases = inds.shape[0]
 
-        weight = weight_function(data, inds)
-
+        # This call to weight_function allows users to define their 
+        # own weight functions with or without the optional args.
+        # :-)
+        weight = weight_function(data, inds, *args)
+        
         edge_weight[index] = weight
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
@@ -301,6 +310,7 @@ class Hypergraph(object):
         self,
         data,
         weight_function=_overlap_coefficient,
+        *args,
     ):
         """
         Compute the incidence matrix and weights of a weighted, undirected hypergraph.
@@ -328,6 +338,9 @@ class Hypergraph(object):
                 and that returns the single edge weight (a numpy.float64).
                 By default, a numba compiled function calculating the overlap 
                 coefficient as the edge weights is used.
+                
+            *args : optional data to pass into the weight function. Unused by 
+                default - may be used for custom weight calculations.
 
         Sets
         ----
@@ -386,7 +399,12 @@ class Hypergraph(object):
         edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
-        (inc_mat, edge_weight, node_weight) = _compute_weights(data_array, work_list, weight_function)
+        (inc_mat, edge_weight, node_weight) = _compute_weights(
+            data_array, 
+            work_list, 
+            weight_function, 
+            args
+        )
         # traverse the edge list again to create a list of string labels
         edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
@@ -582,38 +600,3 @@ class Hypergraph(object):
             eigenvalue_error_estimate,
             new_eigenvector_estimate
         )
-
-
-def unweighted_hypergraph_fn(data, work_list):
-    """
-    Sets all hypergraph weights to 1, creating an unweighted hypergraph.
-    """
-    incidence_matrix = np.zeros(shape=(work_list.shape[0], work_list.shape[1] + 1), dtype=np.uint8)
-    for index in range(work_list.shape[0]):
-
-        inds = work_list[index, :]
-        inds = inds[inds != -1]
-        n_diseases = inds.shape[0]
-
-        numerator = 0.0
-
-        for ii in range(data.shape[0]):
-            loop_sum = 0
-            for jj in range(n_diseases):
-                loop_sum += data[ii, inds[jj]]
-
-            if loop_sum == n_diseases:
-                numerator += 1.0
-
-            for jj in range(n_diseases):
-                incidence_matrix[index, inds[jj]] = 1
-
-    node_weight = np.ones(shape=data.shape[1], dtype=np.float64)
-    edge_weight = np.ones(shape=work_list.shape[0], dtype=np.float64)
-
-    return (incidence_matrix, edge_weight, node_weight)
-
-if __name__ == "__main__":
-
-
-    print(numba.typeof(_overlap_coefficient))
