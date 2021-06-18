@@ -4,6 +4,7 @@ channels:
 dependencies:
   - numba>=0.48
   - numpy>=1.18
+  - scipy
   - pandas
   - pytest
   - pytest-benchmark

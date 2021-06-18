@@ -8,14 +8,14 @@ data structures.
 import itertools
 import numpy as np
 import numba
+import scipy.sparse as ssp
+import scipy.sparse.linalg as sspl
 
 
 ##########################################
 ## Numba compiled functions here
 
 @numba.jit(
-        #numba.float64
-        #(numba.uint8[:, :], numba.int8[:], numba.types.Tuple(())),
     nopython=True,
     nogil=True,
     fastmath=True,
@@ -171,65 +171,49 @@ def _compute_weights(
     return (incidence_matrix, edge_weight, node_weight)
 
 
-@numba.jit(
-    numba.float64[:](numba.float64[:, :], numba.float64[:]),
-    nopython=True,
-    parallel=True,
-    fastmath=True,
-)
-def _iterate_vector_bipartite(matrix, vector):
+def _bipartite_eigenvector(incidence_matrix, weight):
     '''
-    This function performs one Chebyshev iteration to calculate the
-    largest eigenvalue and corresponding eigenvector of the bipartite
-    representation of the hypergraph.
-
-    Note: the variable ``matrix'' here must include the weights, since the
-    adjacency matrix is constructed by placing this matrix in the appropriate
-    place in a matrix of zeros.
+    This computest the largest eigenvalue and corresponding 
+    eigenvector of the bipartite representation of the hypergraph.
+    
+    We use the fact that even though the full adjacency matrix will 
+    not fit in memory for a relatively small hypergraph, the adjacency 
+    matrix for the bipartite representation is sparse and essentially 
+    consists of two copies of the incidence matrix. Therefore functions 
+    that act on sparse matrices are leveraged to do the calculation.
+    
 
     Parameters
     ----------
 
-        matrix : numpy.array (dtype=numpy.float64)
+        incidence_matrix : numpy.array (dtype=numpy.float64)
             The incidence matrix multiplied by a diagonal matrix of weights.
             ie (matrix.T * diag(weight)).T
 
-        vector : numpy.array(dtype=numpy.float64)
-            The vector to multiply the (bipartite adjacency) matrix by.
-            Must have n_nodes + n_edges elements.
+        weight : numpy.array(dtype=numpy.float64)
+            A vector of edge weights.
 
     Returns
     -------
 
+         numpy.float64
+            The calculated eigenvalue 
+            
          numpy.array(dtype=numpy.float64)
-            The result of matrix * vector
+            The calculated eigenvector
 
     '''
-
-    n_edges, n_nodes = matrix.shape
-    result = np.zeros_like(vector)
-    for i in numba.prange(len(vector)):
-
-        if i < n_nodes:
-            j_lim = range(n_nodes, n_edges + n_nodes)
-        else:
-            j_lim = range(0, n_nodes)
-
-        for j in j_lim:
-
-            if i >= n_nodes and j < n_nodes:
-                result[i] += matrix[i - n_nodes, j] * vector[j]
-            elif i < n_nodes and j >= n_nodes and j <= (n_edges + n_nodes):
-                result[i] += matrix[j - n_nodes, i] * vector[j]
-
-        # treat the matrix as if it has ones on the diagonal.
-        # This is because this matrix is guaranteed(?) to be singular and symmetric, therefore
-        # the eigenvalues form +/- pairs and there is no single eigenvalue with the largest
-        # modulus. Without this the algorithm will never converge
-        result[i] += vector[i]
-
-    return result
-
+    weighted_matrix = np.multiply(incidence_matrix, weight.reshape((-1, 1)))
+    n_edges, n_nodes = weighted_matrix.shape 
+    total_elems = n_edges + n_nodes
+    
+    adjacency_matrix = ssp.lil_matrix((total_elems, total_elems)) 
+    adjacency_matrix[n_nodes:total_elems, 0:n_nodes] = weighted_matrix
+    adjacency_matrix[0:n_nodes, n_nodes:total_elems] = weighted_matrix.T
+    
+    eig_val, eig_vec = sspl.eigsh(adjacency_matrix, k=1)
+    
+    return eig_val[0], eig_vec.reshape(-1)
 
 @numba.jit(
     numba.float64[:](numba.uint8[:, :], numba.float64[:], numba.float64[:]),
@@ -532,16 +516,26 @@ class Hypergraph(object):
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
             weight = self.node_weights
         elif rep == "bipartite":
-            old_eigenvector_estimate = rng.random(np.sum(self.incidence_matrix.shape), dtype='float64')
-            inc_mat = np.dot(self.incidence_matrix.T, np.diag(self.edge_weights)).T
-
+            
+            # We treat the bipartite representation differently - 
+            # the adjacency matrix is sparse, so we can use a sparse matrix
+            # datatype and compute the eigevector directly 
+            
+            eig_val, eig_vec = _bipartite_eigenvector(
+                self.incidence_matrix, 
+                self.edge_weights
+            )
+            return (eig_val, 0, eig_vec)
+            
+            
+            
         # 1) Initial checks
 
         # Check the weight vector is the right shape
         # not sure this is needd because both of these variables are coming from
         # internal state, but we'll keep it unless we end up with a reason to
         # get rid of it.
-        if rep != "bipartite" and inc_mat.shape[1] != len(weight):
+        if inc_mat.shape[1] != len(weight):
             raise Exception(
                 ("The weight vector and the second index of the " +
                  "incidence matrix must be the same length")
@@ -556,23 +550,16 @@ class Hypergraph(object):
         # However, iterate_vector() is quadratic in long_axis_size, whereas
         # all the other operations here are linear in it, so we are spend very
         # little time in the rest of this loop body.
-
         for iteration in range(max_iterations):
 
             if verbose:
                 print("\rRunning iteration {}...".format(iteration), end="")
 
-            if rep == "bipartite":
-                new_eigenvector_estimate = _iterate_vector_bipartite(
-                    inc_mat,
-                    old_eigenvector_estimate
-                )
-            else:
-                new_eigenvector_estimate = _iterate_vector(
-                    inc_mat,
-                    weight,
-                    old_eigenvector_estimate
-                )
+            new_eigenvector_estimate = _iterate_vector(
+                inc_mat,
+                weight,
+                old_eigenvector_estimate
+            )
 
             # To estimate eigenvalue, take ratio of new to old eigenvector
             # ignoring zeroes
@@ -610,9 +597,6 @@ class Hypergraph(object):
                     eigenvalue_error_estimate
                     )
                 )
-
-        if rep == "bipartite":
-            eigenvalue_estimate = eigenvalue_estimate - 1.0
 
         return (
             eigenvalue_estimate,
