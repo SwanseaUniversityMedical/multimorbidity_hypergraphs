@@ -213,7 +213,7 @@ def _bipartite_eigenvector(incidence_matrix, weight):
     
     eig_val, eig_vec = sspl.eigsh(adjacency_matrix, k=1)
     
-    return eig_val[0], eig_vec.reshape(-1)
+    return np.abs(eig_val[0]), np.abs(eig_vec.reshape(-1))
 
 @numba.jit(
     numba.float64[:](numba.uint8[:, :], numba.float64[:], numba.float64[:]),
