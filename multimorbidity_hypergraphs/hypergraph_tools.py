@@ -24,14 +24,14 @@ def _overlap_coefficient(data, inds, *args):
     """
     This function calculates the overlap coefficient for a dataset
     and a single set of diseases.
-    
+
     Note, the user may provide their own weighting function to use
     in the compute_hypergraph method, and may use this as a template
     as the type has to match the type of this function.
-    
+
     Parameters
     ----------
-    
+
         data : numpy.array(dtype=numpy.uint8)
             a table indicating whether an individual (rows) is present
             in a node or not (columns).
@@ -39,15 +39,15 @@ def _overlap_coefficient(data, inds, *args):
         inds : numpy.array(dtype=numpy.int8)
             a vector specifying the edge (sets of nodes) to compute the
             overlap coefficient for. Since this is a numba function that is
-            JIT compiled for performance, this is a numpy array. The 
-            edges is encoded as lists of integer indices representing 
+            JIT compiled for performance, this is a numpy array. The
+            edges is encoded as lists of integer indices representing
             nodes connected to the edge.
-            
+
     Returns
     -------
-    
+
         numpy.float64 : The calculated overlap coefficient.
-    
+
     """
     n_diseases = inds.shape[0]
     numerator = 0.0
@@ -101,12 +101,12 @@ def _compute_weights(
             indices representing nodes connected to the edge. When the end
             of the edge is reached, the row is filled to the end with
             -1 (since edges can connect to any number of nodes).
-        
-        weight_function : callable, jit compiled function 
-            a function that takes the data and a vector representing an edge 
-            and returns a weight. 
-            
-        *args : optional 
+
+        weight_function : callable, jit compiled function
+            a function that takes the data and a vector representing an edge
+            and returns a weight.
+
+        *args : optional
             optional data to pass to a custom weight function
 
     Returns
@@ -143,18 +143,18 @@ def _compute_weights(
     # Also, if I put this print statement above the intialisation of the
     # incidence matrix and edge weight vector the tests fail again.
     # *shakes head. Numba is broken.
-    
+
     for index in numba.prange(work_list.shape[0]):
 
         inds = work_list[index, :]
         inds = inds[inds != -1]
         n_diseases = inds.shape[0]
 
-        # This call to weight_function allows users to define their 
+        # This call to weight_function allows users to define their
         # own weight functions with or without the optional args.
         # :-)
         weight = weight_function(data, inds, *args)
-        
+
         edge_weight[index] = weight
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
@@ -235,7 +235,7 @@ def _iterate_vector_bipartite(matrix, vector):
     numba.float64[:](numba.uint8[:, :], numba.float64[:], numba.float64[:]),
     nopython=True,
     parallel=True,
-    fastmath=True,
+    fastmath=False,
 )
 def _iterate_vector(incidence_matrix, weight, vector):
     '''
@@ -270,19 +270,38 @@ def _iterate_vector(incidence_matrix, weight, vector):
             diagonal elements of matrix * weight * transpose(matrix) set to zero.
     '''
 
-    result = np.zeros_like(vector)
-    intermediate = np.zeros_like(incidence_matrix, dtype=np.float64)
+    # we are calculating [M W M^T - diag(M W M^T)] v
+    term_1 = np.zeros_like(vector)
 
-    # this bit is M * W where W = diag(weights)
-    for i in numba.prange(intermediate.shape[0]):
-        for j in range(intermediate.shape[1]):
-            intermediate[i, j] += incidence_matrix[i, j] * weight[j]
+    # 1) W M^T
+    weighted_incidence = np.zeros_like(incidence_matrix, dtype=np.float64)
+    for i in numba.prange(weighted_incidence.shape[0]):
+        for j in range(weighted_incidence.shape[1]):
+            weighted_incidence[i, j] += incidence_matrix[i, j] * weight[j]
 
-    for i in numba.prange(len(vector)):
+
+    # 2) W M^T v
+    intermediate = np.zeros(weighted_incidence.shape[1], dtype=vector.dtype)
+    for k in numba.prange(weighted_incidence.shape[1]):
         for j in range(len(vector)):
-            if i != j:
-                for k in range(incidence_matrix.shape[1]):
-                    result[i] += intermediate[i, k] * incidence_matrix[j, k] * vector[j]
+            intermediate[k] += weighted_incidence[j, k] * vector[j]
+
+    # 3) M W M^T v
+    for i in numba.prange(len(vector)):
+        for k in range(weighted_incidence.shape[1]):
+            term_1[i] += incidence_matrix[i, k] * intermediate[k]
+
+    # 4) diag(M W M^T v) can be done in one step using W M^T from before
+    subt = np.zeros_like(vector)
+    for i in numba.prange(len(vector)):
+        for k in range(weighted_incidence.shape[1]):
+            subt[i] += incidence_matrix[i, k] * weighted_incidence[i, k] * vector[i]
+
+    # 5) subtract one from the other.
+    result = np.zeros_like(vector)
+    for i in numba.prange(len(vector)):
+        result[i] = term_1[i] - subt[i]
+
 
     return result
 
@@ -324,7 +343,7 @@ class Hypergraph(object):
 
         Parameters
         ----------
-        
+
             data : pandas.DataFrame
                 A pandas dataframe with rows corresponding to individuals
                 and columns to diseases. Entries of the dataframe should be zero
@@ -332,14 +351,14 @@ class Hypergraph(object):
                 respectively.
 
             weight_function : callable, optional
-                A numba comiled function that computes the hypergraph weights. This 
+                A numba comiled function that computes the hypergraph weights. This
                 must be a function that takes two arguments (a numpy array of
-                data and a vector representing an edge to compute the weight for) 
+                data and a vector representing an edge to compute the weight for)
                 and that returns the single edge weight (a numpy.float64).
-                By default, a numba compiled function calculating the overlap 
+                By default, a numba compiled function calculating the overlap
                 coefficient as the edge weights is used.
-                
-            *args : optional data to pass into the weight function. Unused by 
+
+            *args : optional data to pass into the weight function. Unused by
                 default - may be used for custom weight calculations.
 
         Sets
@@ -400,9 +419,9 @@ class Hypergraph(object):
 
         # compute the weights
         (inc_mat, edge_weight, node_weight) = _compute_weights(
-            data_array, 
-            work_list, 
-            weight_function, 
+            data_array,
+            work_list,
+            weight_function,
             args
         )
         # traverse the edge list again to create a list of string labels
