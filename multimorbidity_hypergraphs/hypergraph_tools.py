@@ -608,4 +608,4 @@ class Hypergraph(object):
         self 
     ):
     
-        return
+        return np.sum(self.incidence_matrix, axis=0)
