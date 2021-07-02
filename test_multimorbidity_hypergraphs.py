@@ -361,6 +361,10 @@ def test_calculate_EVC_bipartite_hypergraph():
 
 
 def test_EVC_exception_raised():
+    """
+    Tests that an exception is raised when an incorrect representation
+    string is used
+    """
 
     h = hgt.Hypergraph()
     with pytest.raises(Exception):
@@ -370,8 +374,7 @@ def test_EVC_exception_raised():
 def test_degree_centrality_weighted():
 
     """
-    Test the calculation of degree centrality for a hypergraph
-    hypergraph with a unit weights
+    Test the calculation of the weighted degree centrality for a hypergraph
     """
 
     data = np.array([
@@ -411,8 +414,7 @@ def test_degree_centrality_weighted():
 def test_edge_degree_centrality_weighted():
 
     """
-    Test the calculation of degree centrality for a hypergraph
-    hypergraph with a unit weights
+    Test the calculation of the weighted degree centrality for a dual hypergraph
     """
 
     data = np.array([
@@ -450,8 +452,8 @@ def test_edge_degree_centrality_weighted():
 def test_degree_centrality_unweighted():
 
     """
-    Test the calculation of degree centrality for a hypergraph
-    hypergraph with a unit weights
+    Test the calculation of the degree centrality for a hypergraph
+    with unit weights
     """
 
     data = np.array([
@@ -484,8 +486,8 @@ def test_degree_centrality_unweighted():
 def test_edge_degree_centrality_unweighted():
 
     """
-    Test the calculation of degree centrality for a hypergraph
-    hypergraph with a unit weights
+    Test the calculation of the degree centrality for a dual hypergraph
+    with unit weights
     """
 
     data = np.array([
@@ -516,14 +518,21 @@ def test_edge_degree_centrality_unweighted():
         assert act == exp
 
 def test_degree_centrality_exception_raised():
-
+    """
+    Tests that an exception is raised when an incorrect representation
+    string is used
+    """
+    
     h = hgt.Hypergraph()
     with pytest.raises(Exception):
         h.degree_centrality(rep="oh no!")
 
 
 def test_non_standard_weight_function():
-
+    """
+    Tests to make sure a user can specify a non standard weight function 
+    that is used in construct_hypergraph
+    """
     @numba.jit(
         nopython=True,
         nogil=True,
@@ -555,7 +564,12 @@ def test_non_standard_weight_function():
 
 
 def test_non_standard_weight_function_with_optional_arguments():
-
+    """
+    Tests to make sure a user can specify a non standard weight function and 
+    specify optional arguments to be used in construct_hypergraph
+    specify optional arguments to be used in construct_hypergraph
+    """
+    
     @numba.jit(
         nopython=True,
         nogil=True,

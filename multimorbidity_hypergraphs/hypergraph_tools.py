@@ -610,6 +610,45 @@ class Hypergraph(object):
         rep="standard",
         weighted=True
     ):
+        """
+        This method calculates the degree centrality for the hypergraph.
+        
+        One may use this function to compute the centrality of the standard or
+        the dual hypergraph.
+
+        Examples
+        --------
+
+        >>> h = Hypergraph()
+        >>> h.degree_centrality()
+        computes the weighted degree centrality of the standard hypergraph.
+
+        >>> h.eigenvector_centrality(rep="dual")
+        computes the weighted degree centrality of the dual hypergraph.
+
+        >>> h.eigenvector_centrality(weighted=False)
+        computes the unweighted (i.e. all edges are considered to have weight=1)
+        degree centrality of the standard hypergraph.
+
+        Parameters
+        ----------
+        
+            rep : string, optional
+                The representation of the hypergraph for which to calculate the
+                eigenvector centrality. Options are "standard" or "dual"
+                (default "standard")
+
+            weighted : bool, optional
+                Whether or not to use the weights to calculate the degree 
+                centrality (default: True)
+
+
+        Returns
+        -------
+
+            list
+                The calculated degree centralities
+        """    
 
         M = self.incidence_matrix
         if rep == "standard":
