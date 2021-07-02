@@ -603,3 +603,9 @@ class Hypergraph(object):
             eigenvalue_error_estimate,
             new_eigenvector_estimate
         )
+    
+    def degree_centrality(
+        self 
+    ):
+    
+        return
