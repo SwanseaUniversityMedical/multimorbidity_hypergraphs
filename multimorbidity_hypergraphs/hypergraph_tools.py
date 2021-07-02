@@ -526,7 +526,8 @@ class Hypergraph(object):
                 self.edge_weights
             )
             return (eig_val, 0, eig_vec)
-            
+        else:
+            raise Exception("Representation not supported.")
             
             
         # 1) Initial checks
@@ -605,7 +606,15 @@ class Hypergraph(object):
         )
     
     def degree_centrality(
-        self 
+        self,
+        rep="standard"
     ):
     
-        return np.sum(self.incidence_matrix, axis=0)
+        if rep == "standard":
+            ax = 0
+        elif rep == "dual":
+            ax = 1
+        else:
+            raise Exception("Representation not supported.")
+    
+        return np.sum(self.incidence_matrix, axis=ax)

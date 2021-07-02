@@ -1,4 +1,5 @@
 
+import pytest 
 import multimorbidity_hypergraphs as hgt
 import numpy as np
 import pandas as pd
@@ -358,6 +359,11 @@ def test_calculate_EVC_bipartite_hypergraph():
     assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) ** 2 < tolerance).all()
 
+def test_EVC_exception_raised():
+
+    h = hgt.Hypergraph()
+    with pytest.raises(Exception):
+        h.eigenvector_centrality(rep="oh no!")
 
 def test_degree_centrality_unweighted():
 
@@ -426,6 +432,12 @@ def test_edge_degree_centrality_unweighted():
     
     for (act, exp) in zip(exp_degree_centrality, degree_centrality):
         assert act == exp
+
+def test_degree_centrality_exception_raised():
+
+    h = hgt.Hypergraph()
+    with pytest.raises(Exception):
+        h.degree_centrality(rep="oh no!")
 
 
 def test_non_standard_weight_function():
