@@ -607,14 +607,23 @@ class Hypergraph(object):
     
     def degree_centrality(
         self,
-        rep="standard"
+        rep="standard",
+        weighted=True
     ):
     
+        M = self.incidence_matrix
         if rep == "standard":
             ax = 0
+            if weighted:
+                M = np.dot(np.diag(self.edge_weights), self.incidence_matrix)
+                
         elif rep == "dual":
             ax = 1
+            if weighted:
+                M = np.dot(self.incidence_matrix, np.diag(self.node_weights))
+            
         else:
             raise Exception("Representation not supported.")
     
-        return np.sum(self.incidence_matrix, axis=ax)
+            
+        return np.sum(M, axis=ax)
