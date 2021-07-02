@@ -408,6 +408,46 @@ def test_degree_centrality_weighted():
         assert act == exp
 
 
+def test_edge_degree_centrality_weighted():
+
+    """
+    Test the calculation of degree centrality for a hypergraph
+    hypergraph with a unit weights
+    """
+
+    data = np.array([
+        [1, 0, 1, 0],
+        [0, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 1],
+        [0, 1, 1, 1]
+    ])
+    
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+    edge_node_list = [item for sublist in h.edge_list for item in sublist]
+    
+    exp_degree_centrality = []
+    
+    for edge in h.edge_list:
+        dc = 0.0
+        for node in edge:
+            dc += h.node_weights[h.node_list.index(node)]
+        exp_degree_centrality.append(dc)
+    
+    print(exp_degree_centrality)
+    degree_centrality = h.degree_centrality(rep="dual")
+    print(degree_centrality)
+    for (act, exp) in zip(exp_degree_centrality, degree_centrality):
+        assert act == exp
+
+    
+    
 def test_degree_centrality_unweighted():
 
     """
