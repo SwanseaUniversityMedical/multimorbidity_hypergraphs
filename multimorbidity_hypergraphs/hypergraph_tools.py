@@ -173,15 +173,15 @@ def _compute_weights(
 
 def _bipartite_eigenvector(incidence_matrix, weight):
     '''
-    This computest the largest eigenvalue and corresponding 
+    This computest the largest eigenvalue and corresponding
     eigenvector of the bipartite representation of the hypergraph.
-    
-    We use the fact that even though the full adjacency matrix will 
-    not fit in memory for a relatively small hypergraph, the adjacency 
-    matrix for the bipartite representation is sparse and essentially 
-    consists of two copies of the incidence matrix. Therefore functions 
+
+    We use the fact that even though the full adjacency matrix will
+    not fit in memory for a relatively small hypergraph, the adjacency
+    matrix for the bipartite representation is sparse and essentially
+    consists of two copies of the incidence matrix. Therefore functions
     that act on sparse matrices are leveraged to do the calculation.
-    
+
 
     Parameters
     ----------
@@ -197,22 +197,22 @@ def _bipartite_eigenvector(incidence_matrix, weight):
     -------
 
          numpy.float64
-            The calculated eigenvalue 
-            
+            The calculated eigenvalue
+
          numpy.array(dtype=numpy.float64)
             The calculated eigenvector
 
     '''
     weighted_matrix = np.multiply(incidence_matrix, weight.reshape((-1, 1)))
-    n_edges, n_nodes = weighted_matrix.shape 
+    n_edges, n_nodes = weighted_matrix.shape
     total_elems = n_edges + n_nodes
-    
-    adjacency_matrix = ssp.lil_matrix((total_elems, total_elems)) 
+
+    adjacency_matrix = ssp.lil_matrix((total_elems, total_elems))
     adjacency_matrix[n_nodes:total_elems, 0:n_nodes] = weighted_matrix
     adjacency_matrix[0:n_nodes, n_nodes:total_elems] = weighted_matrix.T
-    
+
     eig_val, eig_vec = sspl.eigsh(adjacency_matrix, k=1)
-    
+
     return np.abs(eig_val[0]), np.abs(eig_vec.reshape(-1))
 
 @numba.jit(
@@ -516,20 +516,20 @@ class Hypergraph(object):
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
             weight = self.node_weights
         elif rep == "bipartite":
-            
-            # We treat the bipartite representation differently - 
+
+            # We treat the bipartite representation differently -
             # the adjacency matrix is sparse, so we can use a sparse matrix
-            # datatype and compute the eigevector directly 
-            
+            # datatype and compute the eigevector directly
+
             eig_val, eig_vec = _bipartite_eigenvector(
-                self.incidence_matrix, 
+                self.incidence_matrix,
                 self.edge_weights
             )
             return (eig_val, 0, eig_vec)
         else:
             raise Exception("Representation not supported.")
-            
-            
+
+
         # 1) Initial checks
 
         # Check the weight vector is the right shape
@@ -604,26 +604,25 @@ class Hypergraph(object):
             eigenvalue_error_estimate,
             new_eigenvector_estimate
         )
-    
+
     def degree_centrality(
         self,
         rep="standard",
         weighted=True
     ):
-    
+
         M = self.incidence_matrix
         if rep == "standard":
             ax = 0
             if weighted:
-                M = np.dot(np.diag(self.edge_weights), self.incidence_matrix)
-                
+                M = ssp.diags(self.edge_weights).dot(self.incidence_matrix)
+
         elif rep == "dual":
             ax = 1
             if weighted:
-                M = np.dot(self.incidence_matrix, np.diag(self.node_weights))
-            
+                M = ssp.csr_matrix(self.incidence_matrix).dot(ssp.diags(self.node_weights))
+
         else:
             raise Exception("Representation not supported.")
-    
-            
-        return np.sum(M, axis=ax)
+
+        return list((M.sum(axis=ax)).flat)

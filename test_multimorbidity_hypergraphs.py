@@ -1,5 +1,5 @@
 
-import pytest 
+import pytest
 import multimorbidity_hypergraphs as hgt
 import numpy as np
 import pandas as pd
@@ -381,7 +381,7 @@ def test_degree_centrality_weighted():
         [0, 1, 1, 1],
         [0, 1, 1, 1]
     ])
-    
+
     data_pd = pd.DataFrame(
         data
     ).rename(
@@ -390,9 +390,9 @@ def test_degree_centrality_weighted():
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
     edge_node_list = [item for sublist in h.edge_list for item in sublist]
-    
+
     exp_degree_centrality = []
-    
+
     for node in h.node_list:
         dc = 0.0
         for edge, weight in zip(h.edge_list, h.edge_weights):
@@ -400,10 +400,10 @@ def test_degree_centrality_weighted():
                 if node == edge_node:
                     dc += weight
         exp_degree_centrality.append(dc)
-    
-    
+
+
     degree_centrality = h.degree_centrality()
-    
+
     for (act, exp) in zip(exp_degree_centrality, degree_centrality):
         assert act == exp
 
@@ -422,7 +422,7 @@ def test_edge_degree_centrality_weighted():
         [0, 1, 1, 1],
         [0, 1, 1, 1]
     ])
-    
+
     data_pd = pd.DataFrame(
         data
     ).rename(
@@ -431,23 +431,22 @@ def test_edge_degree_centrality_weighted():
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
     edge_node_list = [item for sublist in h.edge_list for item in sublist]
-    
+
     exp_degree_centrality = []
-    
+
     for edge in h.edge_list:
         dc = 0.0
         for node in edge:
             dc += h.node_weights[h.node_list.index(node)]
         exp_degree_centrality.append(dc)
-    
-    print(exp_degree_centrality)
+
     degree_centrality = h.degree_centrality(rep="dual")
-    print(degree_centrality)
+
     for (act, exp) in zip(exp_degree_centrality, degree_centrality):
         assert act == exp
 
-    
-    
+
+
 def test_degree_centrality_unweighted():
 
     """
@@ -462,7 +461,7 @@ def test_degree_centrality_unweighted():
         [0, 1, 1, 1],
         [0, 1, 1, 1]
     ])
-    
+
     data_pd = pd.DataFrame(
         data
     ).rename(
@@ -471,14 +470,14 @@ def test_degree_centrality_unweighted():
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
     edge_node_list = [item for sublist in h.edge_list for item in sublist]
-    
+
     exp_degree_centrality = []
-    
+
     for node in h.node_list:
         exp_degree_centrality.append(np.sum([node == i for i in edge_node_list]))
-    
+
     degree_centrality = h.degree_centrality(weighted=False)
-    
+
     for (act, exp) in zip(exp_degree_centrality, degree_centrality):
         assert act == exp
 
@@ -496,7 +495,7 @@ def test_edge_degree_centrality_unweighted():
         [0, 1, 1, 1],
         [0, 1, 1, 1]
     ])
-    
+
     data_pd = pd.DataFrame(
         data
     ).rename(
@@ -505,14 +504,14 @@ def test_edge_degree_centrality_unweighted():
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
     edge_node_list = [item for sublist in h.edge_list for item in sublist]
-    
+
     exp_degree_centrality = []
-    
+
     for edge in h.edge_list:
         exp_degree_centrality.append(len(edge))
-    
+
     degree_centrality = h.degree_centrality(rep="dual", weighted=False)
-    
+
     for (act, exp) in zip(exp_degree_centrality, degree_centrality):
         assert act == exp
 
