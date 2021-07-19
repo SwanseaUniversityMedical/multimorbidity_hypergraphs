@@ -11,6 +11,8 @@ import numba
 import scipy.sparse as ssp
 import scipy.sparse.linalg as sspl
 
+from time import time
+
 
 ##########################################
 ## Numba compiled functions here
@@ -128,7 +130,7 @@ def _compute_weights(
     """
 
 
-    incidence_matrix = np.zeros(shape=(work_list.shape[0], work_list.shape[1] + 1), dtype=np.uint8)
+    incidence_matrix = np.zeros(shape=(work_list.shape[0], data.shape[1]), dtype=np.uint8)
     edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
 
     # NOTE (Jim 14/6/2021)
@@ -289,6 +291,16 @@ def _iterate_vector(incidence_matrix, weight, vector):
 
     return result
 
+def _reduced_powerset(iterable, min_set=0, max_set=None):
+    
+    if max_set is None:
+        max_set = len(iterable)+1
+    
+    return itertools.chain.from_iterable(
+        itertools.combinations(iterable, r) for r in range(min_set, max_set)
+    )
+
+
 ##########################################
 ## Public API here
 
@@ -377,24 +389,56 @@ class Hypergraph(object):
             None
 
         """
-
+        
         # construct a matrix of flags from the pandas input
         data_array = data.to_numpy().astype(np.uint8)
 
         # create a list of edges (numpy array of indices)
         node_list_string = data.keys().tolist()
         node_list = list(range(data_array.shape[1]))
-        edge_list = list(
-            itertools.chain(
-                *[itertools.combinations(node_list, ii) for ii in range(2, len(node_list))]
-            )
-        )
+        n_diseases = len(node_list)
+        
+        
+        #if not(all_edges):
+        t = time()
+        m_data = np.unique(data_array, axis=0)
+        
+        # Alex's solution (fails some tests because it's 
+        # returning a set of all diseases.
+        #unique_co_occurences = [list(np.where(elem)[0]) for elem in m_data[np.sum(m_data, axis=1)>=2]]
+        #valid_powersets = [
+        #    set(itertools.chain(
+        #        *[list(itertools.combinations(elem, i)) for i in range(2, len(elem) + 1)]
+        #    )) for elem in unique_co_occurences
+        #]
+        #edge_list = [list(elem) for elem in set.union(*valid_powersets)]
+
+        # my solution
+        m_data = m_data[np.sum(m_data, axis=1) >= 2]
+        edge_list = list(set().union(*[
+            list(
+                _reduced_powerset(
+                    np.where(i)[0], 
+                    min_set=2, 
+                    max_set=np.min([np.sum(i)+1, n_diseases])
+                )
+            ) for i in m_data
+        ]))
+        print("Edge list construction took {:.2f}".format(time() - t))
+        #else:
+            # All possible edges solution 
+        #    edge_list = list(
+        #        itertools.chain(
+        #            *[itertools.combinations(node_list, ii) for ii in range(2, len(node_list))]
+        #        )
+        #    )
+    
         max_edge = np.max([len(ii) for ii in edge_list])
         work_list = np.array(
             [list(ii) + [-1] * (max_edge - len(ii)) for ii in edge_list],
             dtype=np.int8
         )
-
+        
         # shuffle the work list to improve runtime
         reindex = np.arange(work_list.shape[0])
         np.random.shuffle(reindex)
@@ -665,3 +709,5 @@ class Hypergraph(object):
             raise Exception("Representation not supported.")
 
         return list((M.sum(axis=ax)).flat)
+
+    
