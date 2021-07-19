@@ -420,7 +420,7 @@ class Hypergraph(object):
                 _reduced_powerset(
                     np.where(i)[0], 
                     min_set=2, 
-                    max_set=np.min([np.sum(i)+1, n_diseases])
+                    max_set=np.min([np.sum(i)+1, n_diseases]).astype(np.int64)
                 )
             ) for i in m_data
         ]))
