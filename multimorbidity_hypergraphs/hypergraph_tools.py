@@ -292,10 +292,42 @@ def _iterate_vector(incidence_matrix, weight, vector):
     return result
 
 def _reduced_powerset(iterable, min_set=0, max_set=None):
-    
+    """
+    This function computes the (potentially) reduced powerset
+    of an iterable container of objects.
+
+    By default, the function returns the full powerset of the
+    iterable, including the empty set and the full container itself.
+    The size of returned sets can be limited using the min_set and
+    max_set optional arguments.
+
+    Parameters
+    ----------
+
+        iterable : iterable
+            A container of objects for wheich to construct the
+            (refuced) powerset.
+
+        min_set : int, optional
+            The smallest size of set to include in the reduced
+            powerset. Default 0.
+
+        max_set : int, optional
+            The largest size of set to include in the reduced
+            powerset. By default, sets up to len(iterable) are
+            included.
+
+    Returns
+    -------
+
+         itertools.chain :
+            An iterator that iterates through all possible elements
+            in the reduced powerset of the input iterable.
+    """
+
     if max_set is None:
         max_set = len(iterable)+1
-    
+
     return itertools.chain.from_iterable(
         itertools.combinations(iterable, r) for r in range(min_set, max_set)
     )
@@ -389,7 +421,7 @@ class Hypergraph(object):
             None
 
         """
-        
+
         # construct a matrix of flags from the pandas input
         data_array = data.to_numpy().astype(np.uint8)
 
@@ -397,13 +429,14 @@ class Hypergraph(object):
         node_list_string = data.keys().tolist()
         node_list = list(range(data_array.shape[1]))
         n_diseases = len(node_list)
-        
-        
-        #if not(all_edges):
+
         t = time()
         m_data = np.unique(data_array, axis=0)
-        
-        # Alex's solution (fails some tests because it's 
+
+        # I'm very grateful to Alex Lee for providing the initial version of this
+        # edge pruning solution. Thank you!
+
+        # Alex's solution (fails some tests because it's
         # returning a set of all diseases.
         #unique_co_occurences = [list(np.where(elem)[0]) for elem in m_data[np.sum(m_data, axis=1)>=2]]
         #valid_powersets = [
@@ -418,27 +451,27 @@ class Hypergraph(object):
         edge_list = list(set().union(*[
             list(
                 _reduced_powerset(
-                    np.where(i)[0], 
-                    min_set=2, 
+                    np.where(i)[0],
+                    min_set=2,
                     max_set=np.min([np.sum(i)+1, n_diseases]).astype(np.int64)
                 )
             ) for i in m_data
         ]))
         print("Edge list construction took {:.2f}".format(time() - t))
-        #else:
-            # All possible edges solution 
-        #    edge_list = list(
-        #        itertools.chain(
-        #            *[itertools.combinations(node_list, ii) for ii in range(2, len(node_list))]
-        #        )
+
+        # All possible edges solution
+        #edge_list = list(
+        #    itertools.chain(
+        #        *[itertools.combinations(node_list, ii) for ii in range(2, len(node_list))]
         #    )
-    
+        #)
+
         max_edge = np.max([len(ii) for ii in edge_list])
         work_list = np.array(
             [list(ii) + [-1] * (max_edge - len(ii)) for ii in edge_list],
             dtype=np.int8
         )
-        
+
         # shuffle the work list to improve runtime
         reindex = np.arange(work_list.shape[0])
         np.random.shuffle(reindex)
@@ -656,7 +689,7 @@ class Hypergraph(object):
     ):
         """
         This method calculates the degree centrality for the hypergraph.
-        
+
         One may use this function to compute the centrality of the standard or
         the dual hypergraph.
 
@@ -676,14 +709,14 @@ class Hypergraph(object):
 
         Parameters
         ----------
-        
+
             rep : string, optional
                 The representation of the hypergraph for which to calculate the
                 eigenvector centrality. Options are "standard" or "dual"
                 (default "standard")
 
             weighted : bool, optional
-                Whether or not to use the weights to calculate the degree 
+                Whether or not to use the weights to calculate the degree
                 centrality (default: True)
 
 
@@ -692,7 +725,7 @@ class Hypergraph(object):
 
             list
                 The calculated degree centralities
-        """    
+        """
 
         M = self.incidence_matrix
         if rep == "standard":
@@ -710,4 +743,3 @@ class Hypergraph(object):
 
         return list((M.sum(axis=ax)).flat)
 
-    
