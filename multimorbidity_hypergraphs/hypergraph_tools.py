@@ -339,10 +339,20 @@ def _reduced_powerset(iterable, min_set=0, max_set=None):
 
 class Hypergraph(object):
 
-    def __init__(self):
+    def __init__(
+        self,
+        verbose=True
+    ):
         """
         Create an instance of a hypergraph object.
         Currently does no computations.
+
+        Parameters
+        ----------
+
+            verbose : bool, optional
+                When this is set to true the class methods produce additional output to stdout
+                (default: True)
         """
 
         self.incidence_matrix = None
@@ -350,6 +360,7 @@ class Hypergraph(object):
         self.node_weights = None
         self.edge_list = None
         self.node_list = None
+        self.verbose = verbose
 
         return
 
@@ -457,7 +468,8 @@ class Hypergraph(object):
                 )
             ) for i in m_data
         ]))
-        print("Edge list construction took {:.2f}".format(time() - t))
+        if self.verbose:
+            print("Edge list construction took {:.2f}".format(time() - t))
 
         # All possible edges solution
         #edge_list = list(
@@ -509,7 +521,6 @@ class Hypergraph(object):
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
-            verbose=False,
         ):
 
         """
@@ -557,10 +568,6 @@ class Hypergraph(object):
 
             random_seed : int, optional
                 The random seed to use in generating the initial vector (default: 12345)
-
-            verbose : bool, optional
-                When this is set to true the function produces additional output to stdout
-                (default: False)
 
         Returns
         -------
@@ -630,7 +637,7 @@ class Hypergraph(object):
         # little time in the rest of this loop body.
         for iteration in range(max_iterations):
 
-            if verbose:
+            if self.verbose:
                 print("\rRunning iteration {}...".format(iteration), end="")
 
             new_eigenvector_estimate = _iterate_vector(
@@ -651,7 +658,7 @@ class Hypergraph(object):
 
             if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
 
-                if verbose:
+                if self.verbose:
                     print(
                         "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
                             eigenvalue_estimate,
@@ -668,7 +675,7 @@ class Hypergraph(object):
             )
 
         else:
-            if verbose:
+            if self.verbose:
                 print("\nFailed to converge after", iteration, "iterations.")
                 print("Last estimate was {:.2f} ± {:.4f}".format(
                     eigenvalue_estimate,
