@@ -218,7 +218,8 @@ def _bipartite_eigenvector(incidence_matrix, weight):
     return np.abs(eig_val[0]), np.abs(eig_vec.reshape(-1))
 
 @numba.jit(
-    numba.float64[:](numba.uint8[:, :], numba.float64[:], numba.float64[:]),
+    [numba.float64[:](numba.uint8[:, :], numba.float64[:], numba.float64[:]),
+    numba.float64[:](numba.float64[:, :], numba.float64[:], numba.float64[:])],
     nopython=True,
     parallel=True,
     fastmath=False,
@@ -518,6 +519,7 @@ class Hypergraph(object):
     def eigenvector_centrality(
             self,
             rep="standard",
+            weighted_resultant=False,
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
@@ -562,6 +564,13 @@ class Hypergraph(object):
                 The difference between iterations in the eigenvalue at which to
                 assume the algorithm has converged (default: 1e-6)
 
+            weighted_resultant : bool, optional
+                This flag tells the the algorithm to whether to include both edge and node
+                weights in the eigenvector centrality calculation. If this is set to False,
+                the eigenvectors of M^T W M are calculated (or equivalent for the dual hypergraph.
+                If set to True then the eigenvectors of sqrt(W_a) M^T W_b M sqrt(W_a) are
+                calculated. This flag is ignored for the bipartite rep of the hypergraph.
+
             max_iterations : int, optional
                 The maximum number of iterations to perform before terminating the
                 algorithm and assuming it has not converged (default: 100)
@@ -593,10 +602,14 @@ class Hypergraph(object):
         rng = np.random.default_rng(random_seed)
         if rep == "standard":
             inc_mat = self.incidence_matrix.T
+            if weighted_resultant:
+                inc_mat = ssp.diags(np.sqrt(self.node_weights)).dot(inc_mat)
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[1], dtype='float64')
             weight = self.edge_weights
         elif rep == "dual":
             inc_mat = self.incidence_matrix
+            if weighted_resultant:
+                inc_mat = ssp.diags(np.sqrt(self.edge_weights)).dot(inc_mat)
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
             weight = self.node_weights
         elif rep == "bipartite":

@@ -219,7 +219,7 @@ def test_calculate_EVC_standard_hypergraph():
 
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
-    
+
     adjacency_matrix = np.dot(
         h.incidence_matrix.T,
         np.dot(
@@ -250,6 +250,67 @@ def test_calculate_EVC_standard_hypergraph():
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
 
 
+def test_weighted_resultant_EVC_standard_hypergraph():
+    """
+    Test that the eigenvector centrality of the standard hypergraph
+    (centrality of the nodes, with both node and edge weights included)
+    is calculated correctly.
+    """
+
+    n_people = 5000
+    n_diseases = 10
+    tolerance = 1e-6
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    # calculate the adjacency matrix from the incidence matrix and weights
+    # computed by h.compute_hypergraph() tested above.
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+
+    adjacency_matrix = np.dot(
+        np.dot(
+            np.diag(np.sqrt(h.node_weights)),
+            np.dot(
+                h.incidence_matrix.T,
+                np.dot(
+                    np.diag(h.edge_weights),
+                    h.incidence_matrix
+                )
+            )
+        ),
+        np.diag(np.sqrt(h.node_weights))
+    )
+    np.fill_diagonal(adjacency_matrix, 0.0)
+    np_e_vals, np_e_vecs = np.linalg.eigh(adjacency_matrix)
+
+    exp_eval = np.max(np_e_vals)
+    exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
+    exp_evec = exp_evec / np.sqrt(np.dot(exp_evec, exp_evec))
+
+    # The expected eigenvector can sometimes be all negative elements, for
+    # what I assume are numerical reasons. They should always be either all
+    # positive or all negative (i.e. up to an overal scaling of -1).
+    assert (exp_evec > 0).all() | (exp_evec < 0).all()
+    exp_evec = np.abs(exp_evec)
+
+    e_val, eval_err, e_vec = h.eigenvector_centrality(tolerance=tolerance, weighted_resultant=True)
+
+    # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
+    e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+
+    # there is some numerical uncertainty in these calculations
+    assert np.abs(exp_eval - e_val) ** 2 < tolerance
+    assert (np.abs(exp_evec - e_vec) < tolerance).all()
+
+
 def test_calculate_EVC_dual_hypergraph():
     """
     Test that the eigenvector centrality of the dual hypergraph
@@ -269,7 +330,7 @@ def test_calculate_EVC_dual_hypergraph():
 
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
-    
+
     adjacency_matrix = np.dot(
         h.incidence_matrix,
         np.dot(
@@ -289,6 +350,64 @@ def test_calculate_EVC_dual_hypergraph():
 
     e_val, eval_err, e_vec = h.eigenvector_centrality(
         rep="dual",
+        tolerance=tolerance
+    )
+    # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
+    e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+
+    # there is some numerical uncertainty in these calculations
+    assert (exp_eval - e_val) ** 2 < tolerance
+    assert (np.abs(exp_evec - e_vec) < tolerance).all()
+
+
+def test_weighted_resultant_EVC_dual_hypergraph():
+    """
+    Test that the eigenvector centrality of the dual hypergraph
+    (centrality of the edges, with both node and edge weights included)
+    is calculated correctly.
+    """
+
+    n_people = 5000
+    n_diseases = 10
+    tolerance = 1e-6
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    adjacency_matrix = np.dot(
+        np.dot(
+            np.diag(np.sqrt(h.edge_weights)),
+            np.dot(
+                h.incidence_matrix,
+                np.dot(
+                    np.diag(h.node_weights),
+                    h.incidence_matrix.T
+                )
+            )
+        ),
+        np.diag(np.sqrt(h.edge_weights))
+    )
+
+    np.fill_diagonal(adjacency_matrix, 0.0)
+    np_e_vals, np_e_vecs = np.linalg.eigh(adjacency_matrix)
+
+    exp_eval = np.max(np_e_vals)
+    exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
+    exp_evec = exp_evec / np.sqrt(np.dot(exp_evec, exp_evec))
+
+    assert (exp_evec > 0).all() | (exp_evec < 0).all()
+    exp_evec = np.abs(exp_evec)
+
+    e_val, eval_err, e_vec = h.eigenvector_centrality(
+        rep="dual",
+        weighted_resultant=True,
         tolerance=tolerance
     )
     # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
@@ -521,7 +640,7 @@ def test_degree_centrality_exception_raised():
     Tests that an exception is raised when an incorrect representation
     string is used
     """
-    
+
     h = hgt.Hypergraph()
     with pytest.raises(Exception):
         h.degree_centrality(rep="oh no!")
@@ -529,7 +648,7 @@ def test_degree_centrality_exception_raised():
 
 def test_non_standard_weight_function():
     """
-    Tests to make sure a user can specify a non standard weight function 
+    Tests to make sure a user can specify a non standard weight function
     that is used in construct_hypergraph
     """
     @numba.jit(
@@ -564,11 +683,11 @@ def test_non_standard_weight_function():
 
 def test_non_standard_weight_function_with_optional_arguments():
     """
-    Tests to make sure a user can specify a non standard weight function and 
+    Tests to make sure a user can specify a non standard weight function and
     specify optional arguments to be used in construct_hypergraph
     specify optional arguments to be used in construct_hypergraph
     """
-    
+
     @numba.jit(
         nopython=True,
         nogil=True,
