@@ -6,5 +6,6 @@ dependencies:
   - numpy>=1.18
   - scipy
   - pandas
+  - statsmodels
   - pytest
   - pytest-benchmark

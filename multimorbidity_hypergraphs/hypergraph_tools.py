@@ -22,6 +22,48 @@ from time import time
     nogil=True,
     fastmath=True,
 )
+def _wilson_interval_var(num, denom):
+    """
+    Returns an estimate of the variance of the overlap coefficient (and other
+    quantities that feature the some number of people divided by the total population
+    size) derived from the Wilson score interval.
+
+    Parameters
+    ----------
+
+        num : numeric
+            the number of "successes", i.e. the numerator of the rate formula we want
+            to calculate the variance for.
+
+        denom  : numeric
+            the population size of the rate formula we want to calculate the
+            variance for.
+
+    Returns
+    -------
+
+        numpy.float64 : the estimate of the variance.
+    """
+
+    z = 0.67448975 # this is the 25th/75th percentile of the standard normal
+    # NOTE, this is included as if we wanted to calculate the full wilson interval
+    # we would need it. We only want the difference between the interval limits, so
+    # we don't need it.
+    #wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
+    wilson_offset = z * np.sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
+
+    return wilson_offset
+    # NOTE
+    # ((x + a) - (x - a)) / 2
+    # = (2a) / 2
+    # = a
+
+
+@numba.jit(
+    nopython=True,
+    nogil=True,
+    fastmath=True,
+)
 def _overlap_coefficient(data, inds, *args):
     """
     This function calculates the overlap coefficient for a dataset
@@ -50,6 +92,8 @@ def _overlap_coefficient(data, inds, *args):
 
         numpy.float64 : The calculated overlap coefficient.
 
+        numpy.float64 : The calculated variance in the overlap coefficient.
+
     """
     n_diseases = inds.shape[0]
     numerator = 0.0
@@ -69,7 +113,9 @@ def _overlap_coefficient(data, inds, *args):
         if denominator[jj] < denom:
             denom = denominator[jj]
 
-    return numerator / denom
+    wilson_variance_est = _wilson_interval_var(numerator, denom)
+
+    return numerator / denom, wilson_variance_est
 
 @numba.jit(
     nopython=True,
@@ -125,13 +171,22 @@ def _compute_weights(
             that contains the calculated edge weights.
 
         numpy.array
+            The edge weight variance vector, a one dimensional array of length n_edges
+            that contains the calculated variances in the edge weights.
+
+        numpy.array
             The node weight vector, a one dimensional array of length n_nodes
             that contains the calculated node weights.
+
+        numpy.array
+            The node weight variance vector, a one dimensional array of length n_nodes
+            that contains the calculated variances in the node weights.
     """
 
 
     incidence_matrix = np.zeros(shape=(work_list.shape[0], data.shape[1]), dtype=np.uint8)
     edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
+    edge_weight_var = np.zeros(shape=work_list.shape[0], dtype=np.float64)
 
     # NOTE (Jim 14/6/2021)
     # There is an absolutely bizarre bug in Numba 0.53.1
@@ -155,13 +210,15 @@ def _compute_weights(
         # This call to weight_function allows users to define their
         # own weight functions with or without the optional args.
         # :-)
-        weight = weight_function(data, inds, *args)
+        weight, var = weight_function(data, inds, *args)
 
         edge_weight[index] = weight
+        edge_weight_var[index] = var
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
 
     node_weight = np.zeros(shape=data.shape[1], dtype=np.float64)
+    node_weight_var = np.zeros(shape=data.shape[1], dtype=np.float64)
 
     for index in numba.prange(data.shape[1]):
         numerator = 0.0
@@ -169,8 +226,9 @@ def _compute_weights(
             if data[row, index] > 0:
                 numerator += 1.0
         node_weight[index] = (numerator / np.float64(data.shape[0]))
+        node_weight_var[index] = _wilson_interval_var(numerator, np.float64(data.shape[0]))
 
-    return (incidence_matrix, edge_weight, node_weight)
+    return (incidence_matrix, edge_weight, edge_weight_var, node_weight, node_weight_var)
 
 
 def _bipartite_eigenvector(incidence_matrix, weight):
@@ -359,6 +417,8 @@ class Hypergraph(object):
         self.incidence_matrix = None
         self.edge_weights = None
         self.node_weights = None
+        self.edge_weights_var = None
+        self.node_weights_var = None
         self.edge_list = None
         self.node_list = None
         self.verbose = verbose
@@ -410,13 +470,21 @@ class Hypergraph(object):
                 element of the incidence matrix is a flag indicating whether
                 there is a connection between the appropriate node and edge.
 
-            edge_weight : numpy.array
+            edge_weights : numpy.array
                 The edge weight vector, a one dimensional array of length n_edges
                 that contains the calculated edge weights.
 
-            node_weight : numpy.array
+            edge_weights_var : numpy.array
+                The edge weight variance vector, a one dimensional array of length n_edges
+                that contains the calculated variances in the edge weights.
+
+            node_weights : numpy.array
                 The node weight vector, a one dimensional array of length n_nodes
                 that contains the calculated node weights.
+
+            node_weights_var : numpy.array
+                The node weight variance vector, a one dimensional array of length n_nodes
+                that contains the calculated variances in the node weights.
 
             edge_list : list
                 The edge list, a list of edges each element of which is a tuple of strings
@@ -492,7 +560,7 @@ class Hypergraph(object):
         edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
-        (inc_mat, edge_weight, node_weight) = _compute_weights(
+        (inc_mat, edge_weight, edge_weight_var, node_weight, node_weight_var) = _compute_weights(
             data_array,
             work_list,
             weight_function,
@@ -505,13 +573,16 @@ class Hypergraph(object):
         inds = edge_weight > 0
         inc_mat = inc_mat[inds, :]
         edge_weight = edge_weight[inds]
+        edge_weight_var = edge_weight_var[inds]
         edge_list_out = np.array(edge_list_out, dtype="object")[inds].tolist()
         # traverse the edge list one final time to make sure the edges are tuples
         edge_list_out = [tuple(ii) for ii in edge_list_out]
 
         self.incidence_matrix = inc_mat
         self.edge_weights = edge_weight
+        self.edge_weights_var = edge_weight_var
         self.node_weights = node_weight
+        self.node_weights_var = node_weight_var
         self.edge_list = edge_list_out
         self.node_list = node_list_string
         return

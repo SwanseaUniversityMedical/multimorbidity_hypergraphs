@@ -4,6 +4,7 @@ import multimorbidity_hypergraphs as hgt
 import numpy as np
 import pandas as pd
 import numba
+import statsmodels.stats.proportion as smsp
 
 def test_instantiated():
     """
@@ -662,7 +663,7 @@ def test_non_standard_weight_function():
         unweighted hypergraph.
         """
 
-        return 1.0
+        return 1.0, 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -699,7 +700,7 @@ def test_non_standard_weight_function_with_optional_arguments():
         argument.
         """
         print(args[0])
-        return 1.0 / args[0]
+        return 1.0 / args[0], 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -716,6 +717,41 @@ def test_non_standard_weight_function_with_optional_arguments():
 
     #assert len(h.edge_weights) == 1012
     assert (h.edge_weights == 1/2).all()
+
+
+def test_wilson_score_uncertainties():
+    """
+    Tests to make sure the edge weight variance is calculated correctly.
+    """
+    # Not sure I need these additional tests, since the existing tests now must
+    # include the uncertainties.
+    # non standard weight function with uncertainties
+    # non standard weight function with optional args and uncertainties.
+    def overlap_cooef_num_denom(data, edge):
+
+        denominator = data.loc[:, edge].sum().min()
+        numerator = (data.loc[:, edge].sum(axis=1) == len(edge)).sum()
+
+        return (numerator, denominator)
+
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    for i in range(len(h.edge_list)):
+        vals = overlap_cooef_num_denom(data_pd, h.edge_list[0])
+        wilson = smsp.proportion_confint(vals[0], vals[1], alpha=0.5, method="wilson")
+        assert (wilson[1] - wilson[0])/2 - h.edge_weights_var[i] < 0.001
+
 
 
 def test_benchmarking_compute_hypergraph(benchmark):
