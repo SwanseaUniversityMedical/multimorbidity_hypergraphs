@@ -748,8 +748,9 @@ def test_wilson_score_uncertainties():
     h.compute_hypergraph(data_pd)
 
     for i in range(len(h.edge_list)):
-        vals = overlap_cooef_num_denom(data_pd, h.edge_list[0])
+        vals = overlap_cooef_num_denom(data_pd, h.edge_list[i])
         wilson = smsp.proportion_confint(vals[0], vals[1], alpha=0.5, method="wilson")
+        print((wilson[1] - wilson[0])/2, h.edge_weights_var[i])
         assert (wilson[1] - wilson[0])/2 - h.edge_weights_var[i] < 0.001
 
 
