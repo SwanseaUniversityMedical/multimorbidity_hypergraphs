@@ -834,7 +834,13 @@ def test_bootstrap_bipartite_rep():
     e_vec, e_vec_err = h.eigenvector_centrality(rep="bipartite")
     e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="bipartite", bootstrap_samples=10)
 
-    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+    tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
+    
+    # This is a bit hacky...
+    # Since bootstrapping is statistical, we would expect the difference to be 
+    # greater than twice the standard deviation about 5% of the time (if the 
+    # eigenvector elements are normally distributed)
+    assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
 
 
 def test_bootstrap_standard_rep_weighted_resultant():
@@ -891,7 +897,8 @@ def test_bootstrap_dual_rep_weighted_resultant():
         bootstrap_samples=10
     )
 
-    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+    tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
+    assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
 
 
 def test_benchmarking_compute_hypergraph(benchmark):
