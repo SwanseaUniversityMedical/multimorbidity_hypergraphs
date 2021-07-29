@@ -243,13 +243,13 @@ def test_calculate_EVC_standard_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_val, eval_err, e_vec = h.eigenvector_centrality(tolerance=tolerance)
+    e_vec, e_vec_err = h.eigenvector_centrality(tolerance=tolerance)
 
     # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
 
     # there is some numerical uncertainty in these calculations
-    assert np.abs(exp_eval - e_val) ** 2 < tolerance
+    #assert np.abs(exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
 
 
@@ -304,13 +304,13 @@ def test_weighted_resultant_EVC_standard_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_val, eval_err, e_vec = h.eigenvector_centrality(tolerance=tolerance, weighted_resultant=True)
+    e_vec, e_vec_err = h.eigenvector_centrality(tolerance=tolerance, weighted_resultant=True)
 
     # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
 
     # there is some numerical uncertainty in these calculations
-    assert np.abs(exp_eval - e_val) ** 2 < tolerance
+    #assert np.abs(exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
 
 
@@ -351,7 +351,7 @@ def test_calculate_EVC_dual_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_val, eval_err, e_vec = h.eigenvector_centrality(
+    e_vec, e_vec_err = h.eigenvector_centrality(
         rep="dual",
         tolerance=tolerance
     )
@@ -359,7 +359,7 @@ def test_calculate_EVC_dual_hypergraph():
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
 
     # there is some numerical uncertainty in these calculations
-    assert (exp_eval - e_val) ** 2 < tolerance
+    #assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
 
 
@@ -408,7 +408,7 @@ def test_weighted_resultant_EVC_dual_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_val, eval_err, e_vec = h.eigenvector_centrality(
+    e_vec, e_vec_err = h.eigenvector_centrality(
         rep="dual",
         weighted_resultant=True,
         tolerance=tolerance
@@ -417,7 +417,7 @@ def test_weighted_resultant_EVC_dual_hypergraph():
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
 
     # there is some numerical uncertainty in these calculations
-    assert (exp_eval - e_val) ** 2 < tolerance
+    #assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
 
 
@@ -463,7 +463,7 @@ def test_calculate_EVC_bipartite_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_val, eval_err, e_vec = h.eigenvector_centrality(
+    e_vec, e_vec_err = h.eigenvector_centrality(
         rep="bipartite",
         tolerance=tolerance
     )
@@ -477,7 +477,7 @@ def test_calculate_EVC_bipartite_hypergraph():
     # and the module code is
     # a) consistent and
     # b) small compared to the eigenvector elements ( O(0.01%) ).
-    assert (exp_eval - e_val) ** 2 < tolerance
+    #assert (exp_eval - e_val) ** 2 < tolerance
     assert (np.abs(exp_evec - e_vec) ** 2 < tolerance).all()
 
 
@@ -755,6 +755,143 @@ def test_wilson_score_uncertainties():
         print(wilson, h.edge_weights_ci[i])
         assert (wilson - h.edge_weights_ci[i] < 0.001).all()
 
+# test_bootstrap_standard_rep
+# test_bootstrap_dual_rep
+# test_bootstrap_bipartite_rep
+# test_bootstrap_standard_rep_weighted_resultant
+# test_bootstrap_dual_rep_weighted_resultant
+# test_bootstrap_bipartite_rep_weighted_resultant
+
+def test_bootstrap_standard_rep():
+    """
+    Test that the bootstrapped eigenvector centrality provides an answer that is
+    close to the non bootstrapped answer (close means within 2 etimated standard
+    deviations. Standard rep
+    """
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph(verbose=False)
+    h.compute_hypergraph(data_pd)
+
+    e_vec, e_vec_err = h.eigenvector_centrality()
+    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(bootstrap_samples=10)
+
+    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+
+
+def test_bootstrap_dual_rep():
+    """
+    Test that the bootstrapped eigenvector centrality provides an answer that is
+    close to the non bootstrapped answer (close means within 2 etimated standard
+    deviations. Dual rep
+    """
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph(verbose=False)
+    h.compute_hypergraph(data_pd)
+
+    e_vec, e_vec_err = h.eigenvector_centrality(rep="dual")
+    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="dual", bootstrap_samples=10)
+
+    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+
+
+def test_bootstrap_bipartite_rep():
+    """
+    Test that the bootstrapped eigenvector centrality provides an answer that is
+    close to the non bootstrapped answer (close means within 2 etimated standard
+    deviations. Bipartite rep
+    """
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph(verbose=False)
+    h.compute_hypergraph(data_pd)
+
+    e_vec, e_vec_err = h.eigenvector_centrality(rep="bipartite")
+    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="bipartite", bootstrap_samples=10)
+
+    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+
+
+def test_bootstrap_standard_rep_weighted_resultant():
+    """
+    Test that the bootstrapped eigenvector centrality provides an answer that is
+    close to the non bootstrapped answer (close means within 2 etimated standard
+    deviations. Standard rep, weighted resultant.
+    """
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph(verbose=False)
+    h.compute_hypergraph(data_pd)
+
+    e_vec, e_vec_err = h.eigenvector_centrality(weighted_resultant=True)
+    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(
+        weighted_resultant=True,
+        bootstrap_samples=10
+    )
+
+    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+
+
+def test_bootstrap_dual_rep_weighted_resultant():
+    """
+    Test that the bootstrapped eigenvector centrality provides an answer that is
+    close to the non bootstrapped answer (close means within 2 etimated standard
+    deviations. Dual rep, weighted resultant.
+    """
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph(verbose=False)
+    h.compute_hypergraph(data_pd)
+
+    e_vec, e_vec_err = h.eigenvector_centrality(rep="dual", weighted_resultant=True)
+    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(
+        rep="dual",
+        weighted_resultant=True,
+        bootstrap_samples=10
+    )
+
+    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
 
 
 def test_benchmarking_compute_hypergraph(benchmark):

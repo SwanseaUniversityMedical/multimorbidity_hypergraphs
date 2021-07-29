@@ -10,6 +10,7 @@ import numpy as np
 import numba
 import scipy.sparse as ssp
 import scipy.sparse.linalg as sspl
+import scipy.stats as sst
 
 from time import time
 
@@ -187,7 +188,7 @@ def _compute_weights(
     edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
     edge_weight_ci = np.zeros(shape=(work_list.shape[0], 2), dtype=np.float64)
     edge_weight_population = np.zeros(shape=work_list.shape[0], dtype=np.float64)
-    
+
     # NOTE (Jim 14/6/2021)
     # There is an absolutely bizarre bug in Numba 0.53.1
     # (already reported: https://github.com/numba/numba/issues/7105)
@@ -221,7 +222,7 @@ def _compute_weights(
     node_weight = np.zeros(shape=data.shape[1], dtype=np.float64)
     node_weight_ci = np.zeros(shape=(data.shape[1], 2), dtype=np.float64)
     node_weight_population = np.zeros(shape=data.shape[1] , dtype=np.float64)
-    
+
     for index in numba.prange(data.shape[1]):
         numerator = 0.0
         for row in range(data.shape[0]):
@@ -229,17 +230,17 @@ def _compute_weights(
                 numerator += 1.0
         node_weight[index] = (numerator / np.float64(data.shape[0]))
         node_weight_ci[index, :] = _wilson_interval(
-            numerator, 
+            numerator,
             np.float64(data.shape[0])
         )
         node_weight_population[index] = np.float64(data.shape[0])
 
     return (
-        incidence_matrix, 
-        edge_weight, 
+        incidence_matrix,
+        edge_weight,
         edge_weight_ci,
         edge_weight_population,
-        node_weight, 
+        node_weight,
         node_weight_ci,
         node_weight_population,
     )
@@ -433,6 +434,8 @@ class Hypergraph(object):
         self.node_weights = None
         self.edge_weights_ci = None
         self.node_weights_ci = None
+        self.edge_weights_pop = None
+        self.node_weights_pop = None
         self.edge_list = None
         self.node_list = None
         self.verbose = verbose
@@ -574,19 +577,19 @@ class Hypergraph(object):
         edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
-        (inc_mat_original, 
-        edge_weight, 
-        edge_weight_ci, 
-        edge_weight_pop, 
-        node_weight, 
-        node_weight_ci, 
+        (inc_mat_original,
+        edge_weight,
+        edge_weight_ci,
+        edge_weight_pop,
+        node_weight,
+        node_weight_ci,
         node_weight_pop) = _compute_weights(
             data_array,
             work_list,
             weight_function,
             args
         ) # the linter is not going to like this...
-        
+
         # traverse the edge list again to create a list of string labels
         edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
@@ -602,8 +605,10 @@ class Hypergraph(object):
         self.incidence_matrix = inc_mat_original
         self.edge_weights = edge_weight
         self.edge_weights_ci = edge_weight_ci
+        self.edge_weights_pop = edge_weight_pop
         self.node_weights = node_weight
         self.node_weights_ci = node_weight_ci
+        self.node_weights_pop = node_weight_pop
         self.edge_list = edge_list_out
         self.node_list = node_list_string
         return
@@ -665,14 +670,14 @@ class Hypergraph(object):
                 calculated. This flag is ignored for the bipartite rep of the hypergraph.
 
             max_iterations : int, optional
-                The maximum number of iterations (of the power method) to perform before 
+                The maximum number of iterations (of the power method) to perform before
                 terminating the algorithm and assuming it has not converged (default: 100)
 
             random_seed : int, optional
                 The random seed to use in generating the initial vector (default: 12345)
-            
+
             bootstrap_samples : int, optional
-                The number of bootstrap samples to use to estimate the uncertainties in the 
+                The number of bootstrap samples to use to estimate the uncertainties in the
                 eigenvector centrality. (default: 1)
 
         Returns
@@ -697,29 +702,56 @@ class Hypergraph(object):
 
         # 0) setup
         rng = np.random.default_rng(random_seed)
+
         if rep == "standard":
             inc_mat_original = self.incidence_matrix.T
-            if weighted_resultant:
-                inc_mat_original = ssp.diags(np.sqrt(self.node_weights)).dot(inc_mat_original)
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[1], dtype='float64')
+
             weight_original = self.edge_weights
+            weight_population = self.edge_weights_pop
+            weight_resultant = np.sqrt(self.node_weights)
+            resultant_pop = self.node_weights_pop
         elif rep == "dual":
             inc_mat_original = self.incidence_matrix
-            if weighted_resultant:
-                inc_mat_original = ssp.diags(np.sqrt(self.edge_weights)).dot(inc_mat_original)
+            inc_mat_original = self.incidence_matrix
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
+
             weight_original = self.node_weights
+            weight_population = self.node_weights_pop
+            weight_resultant = np.sqrt(self.edge_weights)
+            resultant_pop = self.edge_weights_pop
         elif rep == "bipartite":
 
             # We treat the bipartite representation differently -
             # the adjacency matrix is sparse, so we can use a sparse matrix
             # datatype and compute the eigevector directly
 
-            eig_val, eig_vec = _bipartite_eigenvector(
-                self.incidence_matrix,
-                self.edge_weights
-            )
-            return (eig_val, 0, eig_vec)
+            eigenvector_boot = []
+            eigenvalue_boot = []
+
+            for _ in range(bootstrap_samples):
+
+                inc_mat = self.incidence_matrix
+                if bootstrap_samples > 1:
+                    weight = np.array(
+                        [sst.binom(*weight_ind).rvs() / weight_ind[0]
+                        for weight_ind in zip(self.edge_weights_pop.astype(np.int32), self.edge_weights)]
+                    )
+                else:
+                    weight = self.edge_weights
+
+                eig_val, eig_vec = _bipartite_eigenvector(
+                    inc_mat,
+                    weight
+                )
+
+                eigenvector_boot.append(eig_vec / np.sum(eig_vec))
+                eigenvalue_boot.append(eig_val)
+
+            eigenvector_boot = np.array(eigenvector_boot)
+
+            return eigenvector_boot.mean(axis=0), eigenvector_boot.var(axis=0)
+
         else:
             raise Exception("Representation not supported.")
 
@@ -737,78 +769,100 @@ class Hypergraph(object):
             )
 
         # 2) do the Chebyshev
-        
-        #for bootstrap in range(bootstrap_samples):
-        
-        # apply a perturbation to the weights. Note, we will not do this if the
-        # user has requested only 1 bootstrap iteration or if the uncertainties in the
-        # weights are set to zero.
-        # TODO here
-        inc_mat = inc_mat_original
-        weight = weight_original
-        ####
-    
-        old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
 
-        eigenvalue_estimates, eigenvalue_error_estimates = [], []
+        eigenvector_boot = []
+        eigenvalue_boot = []
 
-        # In principle, the body of this loop could be compiled with Numba.
-        # However, iterate_vector() is quadratic in long_axis_size, whereas
-        # all the other operations here are linear in it, so we are spend very
-        # little time in the rest of this loop body.
-        for iteration in range(max_iterations):
+        for _ in range(bootstrap_samples):
 
-            if self.verbose:
-                print("\rRunning iteration {}...".format(iteration), end="")
+            # apply a perturbation to the weights. Note, we will not do this if the
+            # user has requested only 1 bootstrap iteration or if the uncertainties in the
+            # weights are set to zero.
 
-            new_eigenvector_estimate = _iterate_vector(
-                inc_mat,
-                weight,
-                old_eigenvector_estimate
-            )
+            if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
+                if weighted_resultant:
+                    res_weight = np.array(
+                        [sst.binom(*weight_ind).rvs() / weight_ind[0]
+                        for weight_ind in zip(resultant_pop.astype(np.int32), weight_resultant)]
+                    )
+                    inc_mat = ssp.diags(res_weight).dot(inc_mat_original)
+                else:
+                    inc_mat = inc_mat_original
 
-            # To estimate eigenvalue, take ratio of new to old eigenvector
-            # ignoring zeroes
-            mask = (new_eigenvector_estimate != 0) & (old_eigenvector_estimate != 0)
-            iter_eigenvalue_estimates = new_eigenvector_estimate[mask] / old_eigenvector_estimate[mask]
-            eigenvalue_estimate = iter_eigenvalue_estimates.mean()
-            eigenvalue_error_estimate = iter_eigenvalue_estimates.std()
+                weight = np.array(
+                    [sst.binom(*weight_ind).rvs() / weight_ind[0]
+                    for weight_ind in zip(weight_population.astype(np.int32), weight_original)]
+                )
+            else:
+                if weighted_resultant:
+                    inc_mat = ssp.diags(weight_resultant).dot(inc_mat_original)
+                else:
+                    inc_mat = inc_mat_original
+                weight = weight_original
 
-            eigenvalue_estimates.append(eigenvalue_estimate)
-            eigenvalue_error_estimates.append(eigenvalue_error_estimate)
 
-            if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
+            old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
+
+            eigenvalue_estimates, eigenvalue_error_estimates = [], []
+
+            # In principle, the body of this loop could be compiled with Numba.
+            # However, iterate_vector() is quadratic in long_axis_size, whereas
+            # all the other operations here are linear in it, so we are spend very
+            # little time in the rest of this loop body.
+            for iteration in range(max_iterations):
 
                 if self.verbose:
-                    print(
-                        "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
-                            eigenvalue_estimate,
-                            eigenvalue_error_estimate,
-                            iteration
-                        )
-                    )
-                break
+                    print("\rRunning iteration {}...".format(iteration), end="")
 
-            # Normalise to try to prevent overflows
-            old_eigenvector_estimate = (
-                new_eigenvector_estimate /
-                np.linalg.norm(new_eigenvector_estimate)
-            )
-
-        else:
-            if self.verbose:
-                print("\nFailed to converge after", iteration, "iterations.")
-                print("Last estimate was {:.2f} ± {:.4f}".format(
-                    eigenvalue_estimate,
-                    eigenvalue_error_estimate
-                    )
+                new_eigenvector_estimate = _iterate_vector(
+                    inc_mat,
+                    weight,
+                    old_eigenvector_estimate
                 )
 
-        return (
-            eigenvalue_estimate,
-            eigenvalue_error_estimate,
-            new_eigenvector_estimate
-        )
+                # To estimate eigenvalue, take ratio of new to old eigenvector
+                # ignoring zeroes
+                mask = (new_eigenvector_estimate != 0) & (old_eigenvector_estimate != 0)
+                iter_eigenvalue_estimates = new_eigenvector_estimate[mask] / old_eigenvector_estimate[mask]
+                eigenvalue_estimate = iter_eigenvalue_estimates.mean()
+                eigenvalue_error_estimate = iter_eigenvalue_estimates.std()
+
+                eigenvalue_estimates.append(eigenvalue_estimate)
+                eigenvalue_error_estimates.append(eigenvalue_error_estimate)
+
+                if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
+
+                    if self.verbose:
+                        print(
+                            "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
+                                eigenvalue_estimate,
+                                eigenvalue_error_estimate,
+                                iteration
+                            )
+                        )
+                    break
+
+                # Normalise to try to prevent overflows
+                old_eigenvector_estimate = (
+                    new_eigenvector_estimate /
+                    np.linalg.norm(new_eigenvector_estimate)
+                )
+
+            else:
+                if self.verbose:
+                    print("\nFailed to converge after", iteration, "iterations.")
+                    print("Last estimate was {:.2f} ± {:.4f}".format(
+                        eigenvalue_estimate,
+                        eigenvalue_error_estimate
+                        )
+                    )
+
+            eigenvalue_boot.append(eigenvalue_estimate)
+            eigenvector_boot.append(new_eigenvector_estimate / np.sum(new_eigenvector_estimate))
+
+        eigenvector_boot = np.array(eigenvector_boot)
+        return eigenvector_boot.mean(axis=0), eigenvector_boot.var(axis=0)
+
 
     def degree_centrality(
         self,
@@ -870,4 +924,28 @@ class Hypergraph(object):
             raise Exception("Representation not supported.")
 
         return list((M.sum(axis=ax)).flat)
+
+if __name__ == "__main__":
+
+    n_people = 5000
+    n_diseases = 10
+
+    import pandas as pd
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = Hypergraph(verbose=False)
+    h.compute_hypergraph(data_pd)
+
+    e_vec, e_vec_err = h.eigenvector_centrality(
+        weighted_resultant=True,
+        bootstrap_samples=1
+    )
+
+
 
