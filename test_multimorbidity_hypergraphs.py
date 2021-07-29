@@ -17,7 +17,9 @@ def test_instantiated():
 
     assert h.incidence_matrix is None
     assert h.edge_weights is None
+    assert h.edge_weights_ci is None
     assert h.node_weights is None
+    assert h.node_weights_ci is None
     assert h.edge_list is None
     assert h.node_list is None
 
@@ -663,7 +665,7 @@ def test_non_standard_weight_function():
         unweighted hypergraph.
         """
 
-        return 1.0, 0.0
+        return 1.0, 0.0, 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -700,7 +702,7 @@ def test_non_standard_weight_function_with_optional_arguments():
         argument.
         """
         print(args[0])
-        return 1.0 / args[0], 0.0
+        return 1.0 / args[0], 0.0, 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -749,9 +751,9 @@ def test_wilson_score_uncertainties():
 
     for i in range(len(h.edge_list)):
         vals = overlap_cooef_num_denom(data_pd, h.edge_list[i])
-        wilson = smsp.proportion_confint(vals[0], vals[1], alpha=0.5, method="wilson")
-        print((wilson[1] - wilson[0])/2, h.edge_weights_var[i])
-        assert (wilson[1] - wilson[0])/2 - h.edge_weights_var[i] < 0.001
+        wilson = smsp.proportion_confint(vals[0], vals[1], alpha=0.05, method="wilson")
+        print(wilson, h.edge_weights_ci[i])
+        assert (wilson - h.edge_weights_ci[i] < 0.001).all()
 
 
 

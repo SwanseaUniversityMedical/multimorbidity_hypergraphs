@@ -22,7 +22,7 @@ from time import time
     nogil=True,
     fastmath=True,
 )
-def _wilson_interval_var(num, denom):
+def _wilson_interval(num, denom):
     """
     Returns an estimate of the variance of the overlap coefficient (and other
     quantities that feature the some number of people divided by the total population
@@ -45,14 +45,11 @@ def _wilson_interval_var(num, denom):
         numpy.float64 : the estimate of the variance.
     """
 
-    z = 0.67448975 # this is the 25th/75th percentile of the standard normal
-    # NOTE, this is included as if we wanted to calculate the full wilson interval
-    # we would need it. We only want the difference between the interval limits, so
-    # we don't need it.
-    #wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
+    z = 1.959963984540054 # this is the 2.5th/97.5th percentile of the standard normal
+    wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
     wilson_offset = z * np.sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
 
-    return wilson_offset
+    return (wilson_centre - wilson_offset, wilson_centre + wilson_offset)
     # NOTE
     # ((x + a) - (x - a)) / 2
     # = (2a) / 2
@@ -92,7 +89,9 @@ def _overlap_coefficient(data, inds, *args):
 
         numpy.float64 : The calculated overlap coefficient.
 
-        numpy.float64 : The calculated variance in the overlap coefficient.
+        numpy.float64 : The calculated confidence interval in the overlap coefficient.
+
+        numpy.float64 : The denominator used to calculate the overlap coefficient.
 
     """
     n_diseases = inds.shape[0]
@@ -113,9 +112,9 @@ def _overlap_coefficient(data, inds, *args):
         if denominator[jj] < denom:
             denom = denominator[jj]
 
-    wilson_variance_est = _wilson_interval_var(numerator, denom)
+    wilson_ci = _wilson_interval(numerator, denom)
 
-    return numerator / denom, wilson_variance_est
+    return numerator / denom, wilson_ci, denom
 
 @numba.jit(
     nopython=True,
@@ -186,8 +185,9 @@ def _compute_weights(
 
     incidence_matrix = np.zeros(shape=(work_list.shape[0], data.shape[1]), dtype=np.uint8)
     edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
-    edge_weight_var = np.zeros(shape=work_list.shape[0], dtype=np.float64)
-
+    edge_weight_ci = np.zeros(shape=(work_list.shape[0], 2), dtype=np.float64)
+    edge_weight_population = np.zeros(shape=work_list.shape[0], dtype=np.float64)
+    
     # NOTE (Jim 14/6/2021)
     # There is an absolutely bizarre bug in Numba 0.53.1
     # (already reported: https://github.com/numba/numba/issues/7105)
@@ -210,25 +210,39 @@ def _compute_weights(
         # This call to weight_function allows users to define their
         # own weight functions with or without the optional args.
         # :-)
-        weight, var = weight_function(data, inds, *args)
+        weight, ci, denom = weight_function(data, inds, *args)
 
         edge_weight[index] = weight
-        edge_weight_var[index] = var
+        edge_weight_ci[index, :] = ci
+        edge_weight_population[index] = denom
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
 
     node_weight = np.zeros(shape=data.shape[1], dtype=np.float64)
-    node_weight_var = np.zeros(shape=data.shape[1], dtype=np.float64)
-
+    node_weight_ci = np.zeros(shape=(data.shape[1], 2), dtype=np.float64)
+    node_weight_population = np.zeros(shape=data.shape[1] , dtype=np.float64)
+    
     for index in numba.prange(data.shape[1]):
         numerator = 0.0
         for row in range(data.shape[0]):
             if data[row, index] > 0:
                 numerator += 1.0
         node_weight[index] = (numerator / np.float64(data.shape[0]))
-        node_weight_var[index] = _wilson_interval_var(numerator, np.float64(data.shape[0]))
+        node_weight_ci[index, :] = _wilson_interval(
+            numerator, 
+            np.float64(data.shape[0])
+        )
+        node_weight_population[index] = np.float64(data.shape[0])
 
-    return (incidence_matrix, edge_weight, edge_weight_var, node_weight, node_weight_var)
+    return (
+        incidence_matrix, 
+        edge_weight, 
+        edge_weight_ci,
+        edge_weight_population,
+        node_weight, 
+        node_weight_ci,
+        node_weight_population,
+    )
 
 
 def _bipartite_eigenvector(incidence_matrix, weight):
@@ -417,8 +431,8 @@ class Hypergraph(object):
         self.incidence_matrix = None
         self.edge_weights = None
         self.node_weights = None
-        self.edge_weights_var = None
-        self.node_weights_var = None
+        self.edge_weights_ci = None
+        self.node_weights_ci = None
         self.edge_list = None
         self.node_list = None
         self.verbose = verbose
@@ -474,7 +488,7 @@ class Hypergraph(object):
                 The edge weight vector, a one dimensional array of length n_edges
                 that contains the calculated edge weights.
 
-            edge_weights_var : numpy.array
+            edge_weights_ci : numpy.array
                 The edge weight variance vector, a one dimensional array of length n_edges
                 that contains the calculated variances in the edge weights.
 
@@ -560,29 +574,36 @@ class Hypergraph(object):
         edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
-        (inc_mat, edge_weight, edge_weight_var, node_weight, node_weight_var) = _compute_weights(
+        (inc_mat_original, 
+        edge_weight, 
+        edge_weight_ci, 
+        edge_weight_pop, 
+        node_weight, 
+        node_weight_ci, 
+        node_weight_pop) = _compute_weights(
             data_array,
             work_list,
             weight_function,
             args
-        )
+        ) # the linter is not going to like this...
+        
         # traverse the edge list again to create a list of string labels
         edge_list_out = [[node_list_string[jj] for jj in ii] for ii in edge_list]
 
         # get rid of rows that are all zero.
         inds = edge_weight > 0
-        inc_mat = inc_mat[inds, :]
+        inc_mat_original = inc_mat_original[inds, :]
         edge_weight = edge_weight[inds]
-        edge_weight_var = edge_weight_var[inds]
+        edge_weight_ci = edge_weight_ci[inds]
         edge_list_out = np.array(edge_list_out, dtype="object")[inds].tolist()
         # traverse the edge list one final time to make sure the edges are tuples
         edge_list_out = [tuple(ii) for ii in edge_list_out]
 
-        self.incidence_matrix = inc_mat
+        self.incidence_matrix = inc_mat_original
         self.edge_weights = edge_weight
-        self.edge_weights_var = edge_weight_var
+        self.edge_weights_ci = edge_weight_ci
         self.node_weights = node_weight
-        self.node_weights_var = node_weight_var
+        self.node_weights_ci = node_weight_ci
         self.edge_list = edge_list_out
         self.node_list = node_list_string
         return
@@ -594,6 +615,7 @@ class Hypergraph(object):
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
+            bootstrap_samples=1,
         ):
 
         """
@@ -643,11 +665,15 @@ class Hypergraph(object):
                 calculated. This flag is ignored for the bipartite rep of the hypergraph.
 
             max_iterations : int, optional
-                The maximum number of iterations to perform before terminating the
-                algorithm and assuming it has not converged (default: 100)
+                The maximum number of iterations (of the power method) to perform before 
+                terminating the algorithm and assuming it has not converged (default: 100)
 
             random_seed : int, optional
                 The random seed to use in generating the initial vector (default: 12345)
+            
+            bootstrap_samples : int, optional
+                The number of bootstrap samples to use to estimate the uncertainties in the 
+                eigenvector centrality. (default: 1)
 
         Returns
         -------
@@ -672,17 +698,17 @@ class Hypergraph(object):
         # 0) setup
         rng = np.random.default_rng(random_seed)
         if rep == "standard":
-            inc_mat = self.incidence_matrix.T
+            inc_mat_original = self.incidence_matrix.T
             if weighted_resultant:
-                inc_mat = ssp.diags(np.sqrt(self.node_weights)).dot(inc_mat)
+                inc_mat_original = ssp.diags(np.sqrt(self.node_weights)).dot(inc_mat_original)
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[1], dtype='float64')
-            weight = self.edge_weights
+            weight_original = self.edge_weights
         elif rep == "dual":
-            inc_mat = self.incidence_matrix
+            inc_mat_original = self.incidence_matrix
             if weighted_resultant:
-                inc_mat = ssp.diags(np.sqrt(self.edge_weights)).dot(inc_mat)
+                inc_mat_original = ssp.diags(np.sqrt(self.edge_weights)).dot(inc_mat_original)
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
-            weight = self.node_weights
+            weight_original = self.node_weights
         elif rep == "bipartite":
 
             # We treat the bipartite representation differently -
@@ -704,13 +730,24 @@ class Hypergraph(object):
         # not sure this is needd because both of these variables are coming from
         # internal state, but we'll keep it unless we end up with a reason to
         # get rid of it.
-        if inc_mat.shape[1] != len(weight):
+        if inc_mat_original.shape[1] != len(weight_original):
             raise Exception(
                 ("The weight vector and the second index of the " +
                  "incidence matrix must be the same length")
             )
 
         # 2) do the Chebyshev
+        
+        #for bootstrap in range(bootstrap_samples):
+        
+        # apply a perturbation to the weights. Note, we will not do this if the
+        # user has requested only 1 bootstrap iteration or if the uncertainties in the
+        # weights are set to zero.
+        # TODO here
+        inc_mat = inc_mat_original
+        weight = weight_original
+        ####
+    
         old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
 
         eigenvalue_estimates, eigenvalue_error_estimates = [], []
