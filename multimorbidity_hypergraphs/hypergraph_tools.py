@@ -23,6 +23,60 @@ from time import time
     nogil=True,
     fastmath=True,
 )
+def _binomial_rvs(N, p):
+    """
+    Generates a single random integer from a binomial distribution given
+    a population size and a probability.
+    """
+
+    count = 0
+    while True:
+        wait = np.ceil(np.log(np.random.rand()) / np.log(1-p))
+        if wait > N:
+            return count
+        count += 1
+        N -= wait
+
+
+@numba.jit(
+    nopython=True,
+    nogil=True,
+    parallel=True,
+    fastmath=True,
+)
+def randomize_weights(N_array, p_array):
+    """
+    Generates a set of binomiallly distributed random weights for use in the
+    perturbation uncertainty calculation method. Given an array of populations
+    and probabilities, this function returns the equivalent of
+
+    [sst.binom(N, p).rvs(samples) / N for N, p in zip(N_array, p_array)]
+
+    Parameters
+    ----------
+
+        N_array : numpy.array
+            An array of population sizes
+
+        p_array : numpy.array
+            An array of probabilities
+
+    Returns
+    -------
+
+        numpy.array : an array of random numbers of length len(N_array)
+    """
+    out = np.zeros(len(N_array), dtype=np.float64)
+    for i in numba.prange(len(N_array)):
+        out[i] = _binomial_rvs(N_array[i], p_array[i]) / N_array[i]
+    return out
+
+
+@numba.jit(
+    nopython=True,
+    nogil=True,
+    fastmath=True,
+)
 def _wilson_interval(num, denom):
     """
     Returns an estimate of the variance of the overlap coefficient (and other
@@ -171,16 +225,26 @@ def _compute_weights(
             that contains the calculated edge weights.
 
         numpy.array
-            The edge weight variance vector, a one dimensional array of length n_edges
-            that contains the calculated variances in the edge weights.
+            The edge weight confidence interval vector, a one dimensional array of
+            length n_edges that contains the calculated variances in the edge weights.
+
+        numpy.array
+            The edge weight population vector, a one dimensional array of length n_edges
+            that contains the population sizes used in the calculation of the the edge
+            weights.
 
         numpy.array
             The node weight vector, a one dimensional array of length n_nodes
             that contains the calculated node weights.
 
         numpy.array
-            The node weight variance vector, a one dimensional array of length n_nodes
-            that contains the calculated variances in the node weights.
+            The node weight confidence interval vector, a one dimensional array of
+            length n_nodes that contains the calculated variances in the node weights.
+
+        numpy.array
+            The node weight population vector, a one dimensional array of length n_nodes
+            that contains the population sizes used in the calculation of the the node
+            weights.
     """
 
 
@@ -271,11 +335,11 @@ def _bipartite_eigenvector(incidence_matrix, weight):
     Returns
     -------
 
-         numpy.float64
-            The calculated eigenvalue
-
          numpy.array(dtype=numpy.float64)
             The calculated eigenvector
+
+         numpy.array(dtype=numpy.float64)
+            The calculated uncertainties in the eigenvector elements
 
     '''
     weighted_matrix = np.multiply(incidence_matrix, weight.reshape((-1, 1)))
@@ -492,16 +556,16 @@ class Hypergraph(object):
                 that contains the calculated edge weights.
 
             edge_weights_ci : numpy.array
-                The edge weight variance vector, a one dimensional array of length n_edges
-                that contains the calculated variances in the edge weights.
+                The edge weight confidence interval vector, a one dimensional array of
+                length n_edges that contains the calculated variances in the edge weights.
 
             node_weights : numpy.array
                 The node weight vector, a one dimensional array of length n_nodes
                 that contains the calculated node weights.
 
-            node_weights_var : numpy.array
-                The node weight variance vector, a one dimensional array of length n_nodes
-                that contains the calculated variances in the node weights.
+            node_weights_ci : numpy.array
+                The node weight confidence interval vector, a one dimensional array of
+                length n_nodes that contains the calculated variances in the node weights.
 
             edge_list : list
                 The edge list, a list of edges each element of which is a tuple of strings
@@ -733,10 +797,7 @@ class Hypergraph(object):
 
                 inc_mat = self.incidence_matrix
                 if bootstrap_samples > 1:
-                    weight = np.array(
-                        [sst.binom(*weight_ind).rvs() / weight_ind[0]
-                        for weight_ind in zip(self.edge_weights_pop.astype(np.int32), self.edge_weights)]
-                    )
+                    weight = randomize_weights(self.edge_weights_pop.astype(np.int32), self.edge_weights)
                 else:
                     weight = self.edge_weights
 
@@ -781,18 +842,12 @@ class Hypergraph(object):
 
             if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
                 if weighted_resultant:
-                    res_weight = np.array(
-                        [sst.binom(*weight_ind).rvs() / weight_ind[0]
-                        for weight_ind in zip(resultant_pop.astype(np.int32), weight_resultant)]
-                    )
+                    res_weight = randomize_weights(resultant_pop.astype(np.int32), weight_resultant)
                     inc_mat = ssp.diags(res_weight).dot(inc_mat_original)
                 else:
                     inc_mat = inc_mat_original
 
-                weight = np.array(
-                    [sst.binom(*weight_ind).rvs() / weight_ind[0]
-                    for weight_ind in zip(weight_population.astype(np.int32), weight_original)]
-                )
+                weight = randomize_weights(weight_population.astype(np.int32), weight_original)
             else:
                 if weighted_resultant:
                     inc_mat = ssp.diags(weight_resultant).dot(inc_mat_original)

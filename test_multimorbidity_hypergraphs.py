@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import numba
 import statsmodels.stats.proportion as smsp
+import scipy.stats as sst
 
 def test_instantiated():
     """
@@ -835,10 +836,10 @@ def test_bootstrap_bipartite_rep():
     e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="bipartite", bootstrap_samples=10)
 
     tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
-    
+
     # This is a bit hacky...
-    # Since bootstrapping is statistical, we would expect the difference to be 
-    # greater than twice the standard deviation about 5% of the time (if the 
+    # Since bootstrapping is statistical, we would expect the difference to be
+    # greater than twice the standard deviation about 5% of the time (if the
     # eigenvector elements are normally distributed)
     assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
 
@@ -899,6 +900,24 @@ def test_bootstrap_dual_rep_weighted_resultant():
 
     tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
     assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
+
+
+def test_binomial_random_numbers():
+
+    N = 50000
+    p = 0.001
+    samples = 1000
+    iterations = 500
+    p_values = np.zeros(iterations)
+
+    print(dir(hgt))
+    for i in range(iterations):
+        calc = hgt.randomize_weights(np.ones(samples) * N, np.ones(samples) * p)
+        expected = sst.binom(N, p).rvs(samples) / N
+        res = sst.ks_2samp(expected, calc)
+        p_values[i] = res[1]
+
+    assert np.sum(p_values < 0.05) / iterations < 0.05
 
 
 def test_benchmarking_compute_hypergraph(benchmark):
