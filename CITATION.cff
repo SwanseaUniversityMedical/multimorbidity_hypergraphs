@@ -1,0 +1,25 @@
+# YAML 1.2
+---
+authors: 
+  -
+    affiliation: "Swansea University Medical School"
+    family-names: Rafferty
+    given-names: James
+    orcid: "https://orcid.org/0000-0002-1667-7265"
+  -
+    affiliation: "Swansea University, dept. of Computer Science"
+    family-names: Bennet
+    given-names: Ed
+    orcid: "https://orcid.org/0000-0002-1678-6701"
+  -
+    affiliation: "Swansea University Medical School"
+    family-names: Lee
+    given-names: Alex
+    orcid: "https://orcid.org/0000-0001-7916-024X"
+cff-version: "1.1.0"
+date-released: 2021-08-27
+doi: "10.5281/zenodo.5285009"
+message: "If you use this software, please cite it using these metadata."
+title: "multimorbidity_hypergraphs"
+version: "0.3.1"
+...
