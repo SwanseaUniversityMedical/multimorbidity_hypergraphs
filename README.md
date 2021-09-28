@@ -14,6 +14,6 @@ toolkit that will focus on a small number of specific features. If you
 are looking for a general tool kit for hypergraphs including visualisation, check 
 out hypernetx (https://github.com/pnnl/HyperNetX). 
 
-A publication describing this code is currently under review.
+A publication describing what this code does can be found here: https://www.sciencedirect.com/science/article/pii/S1532046421002458
 
 Run tests using `pytest` in the top directory.
