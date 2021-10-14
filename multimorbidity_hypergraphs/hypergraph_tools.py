@@ -16,7 +16,7 @@ from numpy import int8, int32, uint8, int64, float64
 # array tools
 from numpy import zeros, zeros_like, ones_like, array, arange
 # functions
-from numpy import ceil, log, sqrt, multiply, abs, unique, sum, where, min, max
+from numpy import ceil, log, sqrt, multiply, abs, unique, where
 
 import numba # imported types would clash with some of the numpy imports.
 
@@ -619,13 +619,13 @@ class Hypergraph(object):
         #edge_list = [list(elem) for elem in set.union(*valid_powersets)]
 
         # my solution
-        m_data = m_data[sum(m_data, axis=1) >= 2] # m_data[m_data.sum(axis=1) >= 2]
+        m_data = m_data[m_data.sum(axis=1) >= 2]
         edge_list = list(set().union(*[
             list(
                 _reduced_powerset(
                     where(i)[0],
                     min_set=2,
-                    max_set=min([sum(i)+1, n_diseases]).astype(int64)
+                    max_set=array([i.sum()+1, n_diseases]).min().astype(int64)
                 )
             ) for i in m_data
         ]))
@@ -639,7 +639,7 @@ class Hypergraph(object):
         #    )
         #)
 
-        max_edge = max([len(ii) for ii in edge_list])
+        max_edge = array([len(ii) for ii in edge_list]).max()
         work_list = array(
             [list(ii) + [-1] * (max_edge - len(ii)) for ii in edge_list],
             dtype=int8
@@ -816,7 +816,7 @@ class Hypergraph(object):
                     weight
                 )
 
-                eigenvector_boot.append(eig_vec / sum(eig_vec))
+                eigenvector_boot.append(eig_vec / eig_vec.sum())
                 eigenvalue_boot.append(eig_val)
 
             eigenvector_boot = array(eigenvector_boot)
