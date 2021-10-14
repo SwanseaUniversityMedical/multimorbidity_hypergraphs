@@ -1,6 +1,7 @@
 # Hypergraphs for Multimorbidity Research
 
-[![Tests](https://github.com/jim-rafferty/multimorbidity_hypergraphs/actions/workflows/python-package-conda.yml/badge.svg)](https://github.com/jim-rafferty/multimorbidity_hypergraphs/actions/workflows/python-package-conda.yml) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5285009.svg)](https://doi.org/10.5281/zenodo.5285009)
+[![Tests](https://github.com/jim-rafferty/multimorbidity_hypergraphs/actions/workflows/python-package-conda.yml/badge.svg)](https://github.com/jim-rafferty/multimorbidity_hypergraphs/actions/workflows/python-package-conda.yml) 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5569023.svg)](https://doi.org/10.5281/zenodo.5569023)
 
 This is a collection of tools for constructing and analysing hypergraphs from 
 data. Hypergraphs are very general and powerful objects for data analysis which 
