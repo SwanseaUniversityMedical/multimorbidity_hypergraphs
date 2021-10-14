@@ -838,25 +838,32 @@ class Hypergraph(object):
             # apply a perturbation to the weights. Note, we will not do this if the
             # user has requested only 1 bootstrap iteration or if the uncertainties in the
             # weights are set to zero.
-
+            
+            if weighted_resultant:
+                res_weight = weight_resultant
+            else:
+                res_weight = np.ones_like(weight_resultant)
+                
             if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
                 if weighted_resultant:
-                    res_weight = randomize_weights(resultant_pop.astype(np.int32), weight_resultant)
-                    inc_mat = ssp.diags(np.sqrt(res_weight)).dot(inc_mat_original)
-                else:
-                    inc_mat = inc_mat_original
-
+                    res_weight = randomize_weights(resultant_pop.astype(np.int32), res_weight)
                 weight = randomize_weights(weight_population.astype(np.int32), weight_original)
+                
             else:
-                if weighted_resultant:
-                    inc_mat = ssp.diags(np.sqrt(weight_resultant)).dot(inc_mat_original)
-                else:
-                    inc_mat = inc_mat_original
                 weight = weight_original
 
-
+            weight_norm = np.linalg.norm(weight)
+            res_weight_norm = np.linalg.norm(res_weight)
+            
+            # I'm not sure if we actually need to apply the normalisation to the vectors,
+            # since the eigenvector is being normalised in the end anyway. I don't think this
+            # is using that much time compared to the rest of the function so I will leave it 
+            # in for now.
+            weight = weight / weight_norm 
+            res_weight = res_weight / res_weight_norm
+            
+            inc_mat = ssp.diags(np.sqrt(res_weight)).dot(inc_mat_original)
             old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
-
             eigenvalue_estimates, eigenvalue_error_estimates = [], []
 
             # In principle, the body of this loop could be compiled with Numba.
@@ -912,10 +919,11 @@ class Hypergraph(object):
                     )
 
             eigenvalue_boot.append(eigenvalue_estimate)
-            eigenvector_boot.append(new_eigenvector_estimate / np.sum(new_eigenvector_estimate))
+            # we are applying a scaling to the eigenvector here, so in principle the magnitude also has meaning.
+            eigenvector_boot.append(weight_norm * res_weight_norm * new_eigenvector_estimate / np.linalg.norm(new_eigenvector_estimate))
 
         eigenvector_boot = np.array(eigenvector_boot)
-        return eigenvector_boot.mean(axis=0), eigenvector_boot.var(axis=0)
+        return eigenvector_boot.mean(axis=0), eigenvector_boot.std(axis=0)
 
 
     def degree_centrality(
@@ -997,9 +1005,20 @@ if __name__ == "__main__":
     h.compute_hypergraph(data_pd)
 
     e_vec, e_vec_err = h.eigenvector_centrality(
+        rep="dual",
         weighted_resultant=True,
-        bootstrap_samples=1
+        bootstrap_samples=10
     )
+    
+    print(np.linalg.norm(e_vec))
+    print()
+    print(h.edge_weights[0])
+    print(h.edge_weights_pop[0])
+    print()
+    print(e_vec[0])
+    print(e_vec_err[0])
+    print()
+    print(randomize_weights(np.ones(10) * h.edge_weights_pop[0], np.ones(10) * h.edge_weights[0]))
 
 
 
