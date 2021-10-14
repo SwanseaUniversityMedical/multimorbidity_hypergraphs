@@ -5,12 +5,23 @@ the diseases they do or do not have) by constructing and analysing hypergraph
 data structures.
 """
 
-import itertools
-import numpy as np
-import numba
-import scipy.sparse as ssp
-import scipy.sparse.linalg as sspl
-import scipy.stats as sst
+from itertools import combinations, chain
+
+# numpy imports
+# submodules
+from numpy import random
+from numpy.linalg import norm
+# types
+from numpy import int8, int32, uint8, int64, float64
+# array tools
+from numpy import zeros, zeros_like, ones_like, array, arange
+# functions
+from numpy import ceil, log, sqrt, multiply, abs, unique, sum, where, min, max
+
+import numba # imported types would clash with some of the numpy imports.
+
+from scipy.sparse import lil_matrix, csr_matrix, diags
+from scipy.sparse.linalg import eigsh
 
 from time import time
 
@@ -31,7 +42,7 @@ def _binomial_rvs(N, p):
 
     count = 0
     while True:
-        wait = np.ceil(np.log(np.random.rand()) / np.log(1-p))
+        wait = ceil(log(random.rand()) / log(1-p))
         if wait > N:
             return count
         count += 1
@@ -66,7 +77,7 @@ def randomize_weights(N_array, p_array):
 
         numpy.array : an array of random numbers of length len(N_array)
     """
-    out = np.zeros(len(N_array), dtype=np.float64)
+    out = zeros(len(N_array), dtype=float64)
     for i in numba.prange(len(N_array)):
         out[i] = _binomial_rvs(N_array[i], p_array[i]) / N_array[i]
     return out
@@ -102,7 +113,7 @@ def _wilson_interval(num, denom):
 
     z = 1.959963984540054 # this is the 2.5th/97.5th percentile of the standard normal
     wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
-    wilson_offset = z * np.sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
+    wilson_offset = z * sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
 
     return (wilson_centre - wilson_offset, wilson_centre + wilson_offset)
     # NOTE
@@ -151,7 +162,7 @@ def _overlap_coefficient(data, inds, *args):
     """
     n_diseases = inds.shape[0]
     numerator = 0.0
-    denominator = np.zeros(shape=(n_diseases))
+    denominator = zeros(shape=(n_diseases))
 
     for ii in range(data.shape[0]):
         loop_sum = 0
@@ -248,10 +259,10 @@ def _compute_weights(
     """
 
 
-    incidence_matrix = np.zeros(shape=(work_list.shape[0], data.shape[1]), dtype=np.uint8)
-    edge_weight = np.zeros(shape=work_list.shape[0], dtype=np.float64)
-    edge_weight_ci = np.zeros(shape=(work_list.shape[0], 2), dtype=np.float64)
-    edge_weight_population = np.zeros(shape=work_list.shape[0], dtype=np.float64)
+    incidence_matrix = zeros(shape=(work_list.shape[0], data.shape[1]), dtype=uint8)
+    edge_weight = zeros(shape=work_list.shape[0], dtype=float64)
+    edge_weight_ci = zeros(shape=(work_list.shape[0], 2), dtype=float64)
+    edge_weight_population = zeros(shape=work_list.shape[0], dtype=float64)
 
     # NOTE (Jim 14/6/2021)
     # There is an absolutely bizarre bug in Numba 0.53.1
@@ -283,21 +294,21 @@ def _compute_weights(
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
 
-    node_weight = np.zeros(shape=data.shape[1], dtype=np.float64)
-    node_weight_ci = np.zeros(shape=(data.shape[1], 2), dtype=np.float64)
-    node_weight_population = np.zeros(shape=data.shape[1] , dtype=np.float64)
+    node_weight = zeros(shape=data.shape[1], dtype=float64)
+    node_weight_ci = zeros(shape=(data.shape[1], 2), dtype=float64)
+    node_weight_population = zeros(shape=data.shape[1] , dtype=float64)
 
     for index in numba.prange(data.shape[1]):
         numerator = 0.0
         for row in range(data.shape[0]):
             if data[row, index] > 0:
                 numerator += 1.0
-        node_weight[index] = (numerator / np.float64(data.shape[0]))
+        node_weight[index] = (numerator / float64(data.shape[0]))
         node_weight_ci[index, :] = _wilson_interval(
             numerator,
-            np.float64(data.shape[0])
+            float64(data.shape[0])
         )
-        node_weight_population[index] = np.float64(data.shape[0])
+        node_weight_population[index] = float64(data.shape[0])
 
     return (
         incidence_matrix,
@@ -342,17 +353,17 @@ def _bipartite_eigenvector(incidence_matrix, weight):
             The calculated uncertainties in the eigenvector elements
 
     '''
-    weighted_matrix = np.multiply(incidence_matrix, weight.reshape((-1, 1)))
+    weighted_matrix = multiply(incidence_matrix, weight.reshape((-1, 1)))
     n_edges, n_nodes = weighted_matrix.shape
     total_elems = n_edges + n_nodes
 
-    adjacency_matrix = ssp.lil_matrix((total_elems, total_elems))
+    adjacency_matrix = lil_matrix((total_elems, total_elems))
     adjacency_matrix[n_nodes:total_elems, 0:n_nodes] = weighted_matrix
     adjacency_matrix[0:n_nodes, n_nodes:total_elems] = weighted_matrix.T
 
-    eig_val, eig_vec = sspl.eigsh(adjacency_matrix, k=1)
+    eig_val, eig_vec = eigsh(adjacency_matrix, k=1)
 
-    return np.abs(eig_val[0]), np.abs(eig_vec.reshape(-1))
+    return abs(eig_val[0]), abs(eig_vec.reshape(-1))
 
 @numba.jit(
     [numba.float64[:](numba.uint8[:, :], numba.float64[:], numba.float64[:]),
@@ -395,17 +406,17 @@ def _iterate_vector(incidence_matrix, weight, vector):
     '''
 
     # we are calculating [M W M^T - diag(M W M^T)] v
-    term_1 = np.zeros_like(vector)
+    term_1 = zeros_like(vector)
 
     # 1) W M^T
-    weighted_incidence = np.zeros_like(incidence_matrix, dtype=np.float64)
+    weighted_incidence = zeros_like(incidence_matrix, dtype=float64)
     for i in numba.prange(weighted_incidence.shape[0]):
         for j in range(weighted_incidence.shape[1]):
             weighted_incidence[i, j] += incidence_matrix[i, j] * weight[j]
 
 
     # 2) W M^T v
-    intermediate = np.zeros(weighted_incidence.shape[1], dtype=vector.dtype)
+    intermediate = zeros(weighted_incidence.shape[1], dtype=vector.dtype)
     for k in numba.prange(weighted_incidence.shape[1]):
         for j in range(len(vector)):
             intermediate[k] += weighted_incidence[j, k] * vector[j]
@@ -416,13 +427,13 @@ def _iterate_vector(incidence_matrix, weight, vector):
             term_1[i] += incidence_matrix[i, k] * intermediate[k]
 
     # 4) diag(M W M^T v) can be done in one step using W M^T from before
-    subt = np.zeros_like(vector)
+    subt = zeros_like(vector)
     for i in numba.prange(len(vector)):
         for k in range(weighted_incidence.shape[1]):
             subt[i] += incidence_matrix[i, k] * weighted_incidence[i, k] * vector[i]
 
     # 5) subtract one from the other.
-    result = np.zeros_like(vector)
+    result = zeros_like(vector)
     for i in numba.prange(len(vector)):
         result[i] = term_1[i] - subt[i]
 
@@ -466,8 +477,8 @@ def _reduced_powerset(iterable, min_set=0, max_set=None):
     if max_set is None:
         max_set = len(iterable)+1
 
-    return itertools.chain.from_iterable(
-        itertools.combinations(iterable, r) for r in range(min_set, max_set)
+    return chain.from_iterable(
+        combinations(iterable, r) for r in range(min_set, max_set)
     )
 
 
@@ -584,7 +595,7 @@ class Hypergraph(object):
         """
 
         # construct a matrix of flags from the pandas input
-        data_array = data.to_numpy().astype(np.uint8)
+        data_array = data.to_numpy().astype(uint8)
 
         # create a list of edges (numpy array of indices)
         node_list_string = data.keys().tolist()
@@ -592,14 +603,14 @@ class Hypergraph(object):
         n_diseases = len(node_list)
 
         t = time()
-        m_data = np.unique(data_array, axis=0)
+        m_data = unique(data_array, axis=0)
 
         # I'm very grateful to Alex Lee for providing the initial version of this
         # edge pruning solution. Thank you!
 
         # Alex's solution (fails some tests because it's
         # returning a set of all diseases.
-        #unique_co_occurences = [list(np.where(elem)[0]) for elem in m_data[np.sum(m_data, axis=1)>=2]]
+        #unique_co_occurences = [list(where(elem)[0]) for elem in m_data[sum(m_data, axis=1)>=2]]
         #valid_powersets = [
         #    set(itertools.chain(
         #        *[list(itertools.combinations(elem, i)) for i in range(2, len(elem) + 1)]
@@ -608,13 +619,13 @@ class Hypergraph(object):
         #edge_list = [list(elem) for elem in set.union(*valid_powersets)]
 
         # my solution
-        m_data = m_data[np.sum(m_data, axis=1) >= 2]
+        m_data = m_data[sum(m_data, axis=1) >= 2] # m_data[m_data.sum(axis=1) >= 2]
         edge_list = list(set().union(*[
             list(
                 _reduced_powerset(
-                    np.where(i)[0],
+                    where(i)[0],
                     min_set=2,
-                    max_set=np.min([np.sum(i)+1, n_diseases]).astype(np.int64)
+                    max_set=min([sum(i)+1, n_diseases]).astype(int64)
                 )
             ) for i in m_data
         ]))
@@ -628,17 +639,17 @@ class Hypergraph(object):
         #    )
         #)
 
-        max_edge = np.max([len(ii) for ii in edge_list])
-        work_list = np.array(
+        max_edge = max([len(ii) for ii in edge_list])
+        work_list = array(
             [list(ii) + [-1] * (max_edge - len(ii)) for ii in edge_list],
-            dtype=np.int8
+            dtype=int8
         )
 
         # shuffle the work list to improve runtime
-        reindex = np.arange(work_list.shape[0])
-        np.random.shuffle(reindex)
+        reindex = arange(work_list.shape[0])
+        random.shuffle(reindex)
         work_list = work_list[reindex, :]
-        edge_list = np.array(edge_list, dtype="object")[reindex].tolist()
+        edge_list = array(edge_list, dtype="object")[reindex].tolist()
 
         # compute the weights
         (inc_mat_original,
@@ -662,7 +673,7 @@ class Hypergraph(object):
         inc_mat_original = inc_mat_original[inds, :]
         edge_weight = edge_weight[inds]
         edge_weight_ci = edge_weight_ci[inds]
-        edge_list_out = np.array(edge_list_out, dtype="object")[inds].tolist()
+        edge_list_out = array(edge_list_out, dtype="object")[inds].tolist()
         # traverse the edge list one final time to make sure the edges are tuples
         edge_list_out = [tuple(ii) for ii in edge_list_out]
 
@@ -765,7 +776,7 @@ class Hypergraph(object):
         # Thank you Ed!
 
         # 0) setup
-        rng = np.random.default_rng(random_seed)
+        rng = random.default_rng(random_seed)
 
         if rep == "standard":
             inc_mat_original = self.incidence_matrix.T
@@ -796,7 +807,7 @@ class Hypergraph(object):
 
                 inc_mat = self.incidence_matrix
                 if bootstrap_samples > 1:
-                    weight = randomize_weights(self.edge_weights_pop.astype(np.int32), self.edge_weights)
+                    weight = randomize_weights(self.edge_weights_pop.astype(int32), self.edge_weights)
                 else:
                     weight = self.edge_weights
 
@@ -805,10 +816,10 @@ class Hypergraph(object):
                     weight
                 )
 
-                eigenvector_boot.append(eig_vec / np.sum(eig_vec))
+                eigenvector_boot.append(eig_vec / sum(eig_vec))
                 eigenvalue_boot.append(eig_val)
 
-            eigenvector_boot = np.array(eigenvector_boot)
+            eigenvector_boot = array(eigenvector_boot)
 
             return eigenvector_boot.mean(axis=0), eigenvector_boot.var(axis=0)
 
@@ -838,32 +849,32 @@ class Hypergraph(object):
             # apply a perturbation to the weights. Note, we will not do this if the
             # user has requested only 1 bootstrap iteration or if the uncertainties in the
             # weights are set to zero.
-            
+
             if weighted_resultant:
                 res_weight = weight_resultant
             else:
-                res_weight = np.ones_like(weight_resultant)
-                
+                res_weight = ones_like(weight_resultant)
+
             if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
                 if weighted_resultant:
-                    res_weight = randomize_weights(resultant_pop.astype(np.int32), res_weight)
-                weight = randomize_weights(weight_population.astype(np.int32), weight_original)
-                
+                    res_weight = randomize_weights(resultant_pop.astype(int32), res_weight)
+                weight = randomize_weights(weight_population.astype(int32), weight_original)
+
             else:
                 weight = weight_original
 
-            weight_norm = np.linalg.norm(weight)
-            res_weight_norm = np.linalg.norm(res_weight)
-            
+            weight_norm = norm(weight)
+            res_weight_norm = norm(res_weight)
+
             # I'm not sure if we actually need to apply the normalisation to the vectors,
             # since the eigenvector is being normalised in the end anyway. I don't think this
-            # is using that much time compared to the rest of the function so I will leave it 
+            # is using that much time compared to the rest of the function so I will leave it
             # in for now.
-            weight = weight / weight_norm 
+            weight = weight / weight_norm
             res_weight = res_weight / res_weight_norm
-            
-            inc_mat = ssp.diags(np.sqrt(res_weight)).dot(inc_mat_original)
-            old_eigenvector_estimate /= np.linalg.norm(old_eigenvector_estimate)
+
+            inc_mat = diags(sqrt(res_weight)).dot(inc_mat_original)
+            old_eigenvector_estimate /= norm(old_eigenvector_estimate)
             eigenvalue_estimates, eigenvalue_error_estimates = [], []
 
             # In principle, the body of this loop could be compiled with Numba.
@@ -906,7 +917,7 @@ class Hypergraph(object):
                 # Normalise to try to prevent overflows
                 old_eigenvector_estimate = (
                     new_eigenvector_estimate /
-                    np.linalg.norm(new_eigenvector_estimate)
+                    norm(new_eigenvector_estimate)
                 )
 
             else:
@@ -920,9 +931,9 @@ class Hypergraph(object):
 
             eigenvalue_boot.append(eigenvalue_estimate)
             # we are applying a scaling to the eigenvector here, so in principle the magnitude also has meaning.
-            eigenvector_boot.append(weight_norm * res_weight_norm * new_eigenvector_estimate / np.linalg.norm(new_eigenvector_estimate))
+            eigenvector_boot.append(weight_norm * res_weight_norm * new_eigenvector_estimate / norm(new_eigenvector_estimate))
 
-        eigenvector_boot = np.array(eigenvector_boot)
+        eigenvector_boot = array(eigenvector_boot)
         return eigenvector_boot.mean(axis=0), eigenvector_boot.std(axis=0)
 
 
@@ -975,12 +986,12 @@ class Hypergraph(object):
         if rep == "standard":
             ax = 0
             if weighted:
-                M = ssp.diags(self.edge_weights).dot(self.incidence_matrix)
+                M = diags(self.edge_weights).dot(self.incidence_matrix)
 
         elif rep == "dual":
             ax = 1
             if weighted:
-                M = ssp.csr_matrix(self.incidence_matrix).dot(ssp.diags(self.node_weights))
+                M = csr_matrix(self.incidence_matrix).dot(diags(self.node_weights))
 
         else:
             raise Exception("Representation not supported.")
@@ -993,6 +1004,7 @@ if __name__ == "__main__":
     n_diseases = 10
 
     import pandas as pd
+    import numpy as np
 
     data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
     data_pd = pd.DataFrame(
@@ -1009,7 +1021,7 @@ if __name__ == "__main__":
         weighted_resultant=True,
         bootstrap_samples=10
     )
-    
+
     print(np.linalg.norm(e_vec))
     print()
     print(h.edge_weights[0])
