@@ -937,10 +937,10 @@ class Hypergraph(object):
         >>> h.degree_centrality()
         computes the weighted degree centrality of the standard hypergraph.
 
-        >>> h.eigenvector_centrality(rep="dual")
+        >>> h.degree_centrality(rep="dual")
         computes the weighted degree centrality of the dual hypergraph.
 
-        >>> h.eigenvector_centrality(weighted=False)
+        >>> h.degree_centrality(weighted=False)
         computes the unweighted (i.e. all edges are considered to have weight=1)
         degree centrality of the standard hypergraph.
 
