@@ -773,16 +773,15 @@ class Hypergraph(object):
 
             weight_original = self.edge_weights
             weight_population = self.edge_weights_pop
-            weight_resultant = np.sqrt(self.node_weights)
+            weight_resultant = self.node_weights
             resultant_pop = self.node_weights_pop
         elif rep == "dual":
-            inc_mat_original = self.incidence_matrix
             inc_mat_original = self.incidence_matrix
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
 
             weight_original = self.node_weights
             weight_population = self.node_weights_pop
-            weight_resultant = np.sqrt(self.edge_weights)
+            weight_resultant = self.edge_weights
             resultant_pop = self.edge_weights_pop
         elif rep == "bipartite":
 
@@ -843,14 +842,14 @@ class Hypergraph(object):
             if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
                 if weighted_resultant:
                     res_weight = randomize_weights(resultant_pop.astype(np.int32), weight_resultant)
-                    inc_mat = ssp.diags(res_weight).dot(inc_mat_original)
+                    inc_mat = ssp.diags(np.sqrt(res_weight)).dot(inc_mat_original)
                 else:
                     inc_mat = inc_mat_original
 
                 weight = randomize_weights(weight_population.astype(np.int32), weight_original)
             else:
                 if weighted_resultant:
-                    inc_mat = ssp.diags(weight_resultant).dot(inc_mat_original)
+                    inc_mat = ssp.diags(np.sqrt(weight_resultant)).dot(inc_mat_original)
                 else:
                     inc_mat = inc_mat_original
                 weight = weight_original
