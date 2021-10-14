@@ -910,13 +910,15 @@ def test_binomial_random_numbers():
     iterations = 500
     p_values = np.zeros(iterations)
 
-    print(dir(hgt))
     for i in range(iterations):
         calc = hgt.randomize_weights(np.ones(samples) * N, np.ones(samples) * p)
         expected = sst.binom(N, p).rvs(samples) / N
         res = sst.ks_2samp(expected, calc)
         p_values[i] = res[1]
 
+
+    # NOTE. This is checking <iterations> distributions at the 5% significance level.
+    # i.e. at most 5% of <iterations> tests will have a p-value less than 0.05
     assert np.sum(p_values < 0.05) / iterations < 0.05
 
 

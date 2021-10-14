@@ -16,4 +16,8 @@ out hypernetx (https://github.com/pnnl/HyperNetX).
 
 A publication describing what this code does can be found here: https://www.sciencedirect.com/science/article/pii/S1532046421002458
 
+Install using pip: `pip install multimorbidity-hypergraphs`
+
+To import: `import multimorbidity_hypergraphs as hgt`
+
 Run tests using `pytest` in the top directory.
