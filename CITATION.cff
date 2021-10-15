@@ -17,9 +17,9 @@ authors:
     given-names: Alex
     orcid: "https://orcid.org/0000-0001-7916-024X"
 cff-version: "1.1.0"
-date-released: 2021-10-14
-doi: "10.5281/zenodo.5569023"
+date-released: 2021-10-15
+doi: "10.5281/zenodo.5285008"
 message: "If you use this software, please cite it using these metadata."
 title: "multimorbidity_hypergraphs"
-version: "0.3.2"
+version: "0.3.3"
 ...
