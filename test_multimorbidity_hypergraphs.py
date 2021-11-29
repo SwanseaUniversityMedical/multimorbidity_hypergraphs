@@ -721,6 +721,45 @@ def test_non_standard_weight_function_with_optional_arguments():
     #assert len(h.edge_weights) == 1012
     assert (h.edge_weights == 1/2).all()
 
+def test_non_standard_weight_function_node_and_edge_weights_with_optional_arguments():
+    """
+    Tests to make sure a user can specify a non standard weight function and
+    specify optional arguments to be used in construct_hypergraph
+    specify optional arguments to be used in construct_hypergraph
+    """
+
+    @numba.jit(
+        nopython=True,
+        nogil=True,
+        fastmath=True,
+    )
+    def unit_weights(data, inds, *args):
+        """
+        This function returns a 1.0 divided by a number passed in as an optional
+        argument.
+        """
+        print(args[0])
+        return 1.0 / args[0], 0.0, 0.0
+
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd, unit_weights, 2.0)
+
+    #assert len(h.edge_weights) == 1012
+    assert (h.edge_weights == 1/2).all()
+    assert (h.node_weights == 1/2).all()
+
+
+
 
 def test_wilson_score_uncertainties():
     """

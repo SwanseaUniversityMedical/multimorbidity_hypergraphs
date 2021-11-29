@@ -161,25 +161,36 @@ def _overlap_coefficient(data, inds, *args):
 
     """
     n_diseases = inds.shape[0]
-    numerator = 0.0
-    denominator = zeros(shape=(n_diseases))
+    
+    if n_diseases == 1:
+        # if there is one disease, return the prevalence
+        numerator = 0.0
+        for row in range(data.shape[0]):
+            if data[row, inds[0]] > 0:
+                numerator += 1.0
+        denom = float64(data.shape[0])
+       
+    else:    
+        # if there is more than one disease, return the overlap coeffcient.
+        numerator = 0.0
+        denominator = zeros(shape=(n_diseases))
 
-    for ii in range(data.shape[0]):
-        loop_sum = 0
-        for jj in range(n_diseases):
-            loop_sum += data[ii, inds[jj]]
-            denominator[jj] += data[ii, inds[jj]]
+        for ii in range(data.shape[0]):
+            loop_sum = 0
+            for jj in range(n_diseases):
+                loop_sum += data[ii, inds[jj]]
+                denominator[jj] += data[ii, inds[jj]]
 
-        if loop_sum == n_diseases:
-            numerator += 1.0
+            if loop_sum == n_diseases:
+                numerator += 1.0
 
-    denom = denominator[0]
-    for jj in range(1, n_diseases):
-        if denominator[jj] < denom:
-            denom = denominator[jj]
+        denom = denominator[0]
+        for jj in range(1, n_diseases):
+            if denominator[jj] < denom:
+                denom = denominator[jj]
+
 
     wilson_ci = _wilson_interval(numerator, denom)
-
     return numerator / denom, wilson_ci, denom
 
 @numba.jit(
@@ -299,16 +310,10 @@ def _compute_weights(
     node_weight_population = zeros(shape=data.shape[1] , dtype=float64)
 
     for index in numba.prange(data.shape[1]):
-        numerator = 0.0
-        for row in range(data.shape[0]):
-            if data[row, index] > 0:
-                numerator += 1.0
-        node_weight[index] = (numerator / float64(data.shape[0]))
-        node_weight_ci[index, :] = _wilson_interval(
-            numerator,
-            float64(data.shape[0])
-        )
-        node_weight_population[index] = float64(data.shape[0])
+        weight, ci, denom = weight_function(data, array([index]), *args)
+        node_weight[index] = weight
+        node_weight_ci[index, :] = ci
+        node_weight_population[index] = denom
 
     return (
         incidence_matrix,
