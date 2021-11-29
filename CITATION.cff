@@ -21,5 +21,5 @@ date-released: 2021-10-15
 doi: "10.5281/zenodo.5285008"
 message: "If you use this software, please cite it using these metadata."
 title: "multimorbidity_hypergraphs"
-version: "0.3.3"
+version: "0.3.4"
 ...
