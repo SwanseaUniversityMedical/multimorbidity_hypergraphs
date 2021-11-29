@@ -678,6 +678,8 @@ class Hypergraph(object):
         inc_mat_original = inc_mat_original[inds, :]
         edge_weight = edge_weight[inds]
         edge_weight_ci = edge_weight_ci[inds]
+        edge_weight_pop = edge_weight_pop[inds]
+        
         edge_list_out = array(edge_list_out, dtype="object")[inds].tolist()
         # traverse the edge list one final time to make sure the edges are tuples
         edge_list_out = [tuple(ii) for ii in edge_list_out]

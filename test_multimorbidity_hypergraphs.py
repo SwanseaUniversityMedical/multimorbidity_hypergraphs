@@ -105,6 +105,72 @@ def test_build_hypergraph_edge_weights_zero_sets():
         if exp_edge_weights[k] > 0:
             assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
 
+    assert len(h.edge_weights) == len(h.edge_weights_ci)
+    assert len(h.edge_weights) == len(h.edge_weights_pop)
+
+
+def test_build_hypergraph_edge_weights_zero_sets_custom_weights():
+    """
+    Test that edges with zero weight are correctly discarded when using a custom weight function.
+    """
+    
+    
+    @numba.jit(
+        nopython=True,
+        nogil=True,
+        fastmath=True,
+    )
+    def unit_weights(data, inds):
+        """
+        This function returns a 1.0 divided by a number passed in as an optional
+        argument.
+        """
+        if len(inds) == 3:
+            return 0.0, 0.0, 0.0
+        return 1.0, 0.0, 0.0
+        
+    data = np.array([
+        [1, 0, 1, 0],
+        [0, 1, 0, 0],
+        [0, 1, 0, 1],
+        [0, 1, 1, 1],
+        [1, 1, 1, 1]
+    ])
+
+    exp_edge_weights = {
+        ('disease_0', 'disease_1'): 1,
+        ('disease_0', 'disease_2'): 1,
+        ('disease_1', 'disease_2'): 1,
+        ('disease_0', 'disease_3'): 1,
+        ('disease_1', 'disease_3'): 1,
+        ('disease_2', 'disease_3'): 1,
+        #('disease_0', 'disease_1', 'disease_2'): 0,
+        #('disease_0', 'disease_1', 'disease_3'): 0,
+        #('disease_0', 'disease_2', 'disease_3'): 0,
+        #('disease_1', 'disease_2', 'disease_3'): 0,
+    }
+
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd, unit_weights)
+
+    # make sure there are the right number of sets / weights
+    assert len(h.edge_weights) == len(exp_edge_weights.values())
+
+    # check each non-zero weight
+    for k in exp_edge_weights:
+        if exp_edge_weights[k] > 0:
+            assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
+
+    assert len(h.edge_weights) == len(h.edge_weights_ci)
+    assert len(h.edge_weights) == len(h.edge_weights_pop)
+
+
+
 
 def test_build_hypergraph_node_weights():
     """
