@@ -828,7 +828,7 @@ class Hypergraph(object):
 
             eigenvector_boot = array(eigenvector_boot)
 
-            return eigenvector_boot.mean(axis=0), eigenvector_boot.var(axis=0)
+            return eigenvector_boot.mean(axis=0), eigenvector_boot.std(axis=0)
 
         else:
             raise Exception("Representation not supported.")
