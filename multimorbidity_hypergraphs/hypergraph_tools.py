@@ -80,7 +80,7 @@ def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
     """
     out = zeros(len(N_array), dtype=float64)
     for i in numba.prange(len(N_array)):
-        out[i] = randomisation_fn(N_array[i], p_array[i])# / N_array[i]
+        out[i] = randomisation_fn(N_array[i], p_array[i])
     return out
 
 
