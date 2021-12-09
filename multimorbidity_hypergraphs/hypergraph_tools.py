@@ -43,6 +43,7 @@ def _binomial_rvs(N, p):
     count = 0
     while True:
         wait = ceil(log(random.rand()) / log(1-p))
+
         if wait > N:
             return count
         count += 1
@@ -55,7 +56,7 @@ def _binomial_rvs(N, p):
     parallel=True,
     fastmath=True,
 )
-def randomize_weights(N_array, p_array):
+def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
     """
     Generates a set of binomiallly distributed random weights for use in the
     perturbation uncertainty calculation method. Given an array of populations
@@ -79,7 +80,7 @@ def randomize_weights(N_array, p_array):
     """
     out = zeros(len(N_array), dtype=float64)
     for i in numba.prange(len(N_array)):
-        out[i] = _binomial_rvs(N_array[i], p_array[i]) / N_array[i]
+        out[i] = randomisation_fn(N_array[i], p_array[i]) / N_array[i]
     return out
 
 
@@ -703,6 +704,7 @@ class Hypergraph(object):
             max_iterations=100,
             random_seed=12345,
             bootstrap_samples=1,
+            bootstrap_randomisation_function=_binomial_rvs,
         ):
 
         """
@@ -809,12 +811,16 @@ class Hypergraph(object):
 
             eigenvector_boot = []
             eigenvalue_boot = []
-
             for _ in range(bootstrap_samples):
 
                 inc_mat = self.incidence_matrix
+                print(inc_mat.shape)
                 if bootstrap_samples > 1:
-                    weight = randomize_weights(self.edge_weights_pop.astype(int32), self.edge_weights)
+                    weight = randomize_weights(
+                        self.edge_weights_pop.astype(int32), 
+                        self.edge_weights, 
+                        bootstrap_randomisation_function
+                    )
                 else:
                     weight = self.edge_weights
 
@@ -864,8 +870,16 @@ class Hypergraph(object):
 
             if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
                 if weighted_resultant:
-                    res_weight = randomize_weights(resultant_pop.astype(int32), res_weight)
-                weight = randomize_weights(weight_population.astype(int32), weight_original)
+                    res_weight = randomize_weights(
+                        resultant_pop.astype(int32), 
+                        res_weight, 
+                        bootstrap_randomisation_function
+                    )
+                weight = randomize_weights(
+                    weight_population.astype(int32), 
+                    weight_original, 
+                    bootstrap_randomisation_function
+                )
 
             else:
                 weight = weight_original
