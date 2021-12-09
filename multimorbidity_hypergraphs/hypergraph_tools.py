@@ -39,13 +39,13 @@ def _binomial_rvs(N, p):
     Generates a single random integer from a binomial distribution given
     a population size and a probability.
     """
-
+    N_orig = N
     count = 0
     while True:
         wait = ceil(log(random.rand()) / log(1-p))
 
         if wait > N:
-            return count
+            return count / N_orig
         count += 1
         N -= wait
 
@@ -80,7 +80,7 @@ def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
     """
     out = zeros(len(N_array), dtype=float64)
     for i in numba.prange(len(N_array)):
-        out[i] = randomisation_fn(N_array[i], p_array[i]) / N_array[i]
+        out[i] = randomisation_fn(N_array[i], p_array[i])# / N_array[i]
     return out
 
 

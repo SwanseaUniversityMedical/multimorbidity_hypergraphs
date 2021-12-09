@@ -1027,6 +1027,28 @@ def test_binomial_random_numbers():
     assert np.sum(p_values < 0.05) / iterations < 0.05
 
 
+def test_user_specified_random_number_function():
+
+    @numba.jit(
+        nopython=True,
+        nogil=True,
+        fastmath=True,
+    )
+    def not_random_at_all(N, p):
+        """
+        This function returns a 1.0
+        """
+        return 1.0
+        
+    samples = 1000
+
+    calc = hgt.randomize_weights(np.random.rand(samples), np.random.rand(samples), randomisation_fn=not_random_at_all)
+    print(calc)
+    
+    assert np.all(calc == 1)
+
+
+
 def test_benchmarking_compute_hypergraph(benchmark):
 
     n_people = 5000
