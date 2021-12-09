@@ -36,7 +36,7 @@ from time import time
 )
 def _binomial_rvs(N, p):
     """
-    Generates a single random integer from a binomial distribution given
+    Generates a single random rate from a binomial distribution given
     a population size and a probability.
     """
     N_orig = N
@@ -58,11 +58,14 @@ def _binomial_rvs(N, p):
 )
 def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
     """
-    Generates a set of binomiallly distributed random weights for use in the
-    perturbation uncertainty calculation method. Given an array of populations
-    and probabilities, this function returns the equivalent of
+    Apply a random perturbation to a set of weights.
+    
+    Given an array of populations and probabilities, this function returns 
+    the equivalent of:
 
-    [sst.binom(N, p).rvs(samples) / N for N, p in zip(N_array, p_array)]
+    [sst.<distribution>(N, p).rvs(samples) / N for N, p in zip(N_array, p_array)]
+
+    <distribution> is binomial by default.
 
     Parameters
     ----------
@@ -72,6 +75,11 @@ def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
 
         p_array : numpy.array
             An array of probabilities
+
+        randomization_fn : callable, jit compiled function, optional
+            A function that takes the population and a probaility and returns a 
+            randomly perturbed weight (input arguments subject to change, since
+            this is currently binomial by default).
 
     Returns
     -------
