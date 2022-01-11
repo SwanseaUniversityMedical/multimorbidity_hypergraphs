@@ -29,102 +29,102 @@ from time import time
 ##########################################
 ## Numba compiled functions here
 
-@numba.jit(
-    nopython=True,
-    nogil=True,
-    fastmath=True,
-)
-def _binomial_rvs(N, p):
-    """
-    Generates a single random rate from a binomial distribution given
-    a population size and a probability.
-    """
-    N_orig = N
-    count = 0
-    while True:
-        wait = ceil(log(random.rand()) / log(1-p))
+# @numba.jit(
+   # nopython=True,
+   # nogil=True,
+   # fastmath=True,
+# )
+# def _binomial_rvs(N, p):
+   # """
+   # Generates a single random rate from a binomial distribution given
+   # a population size and a probability.
+   # """
+   # N_orig = N
+   # count = 0
+   # while True:
+       # wait = ceil(log(random.rand()) / log(1-p))
 
-        if wait > N:
-            return count / N_orig
-        count += 1
-        N -= wait
-
-
-@numba.jit(
-    nopython=True,
-    nogil=True,
-    parallel=True,
-    fastmath=True,
-)
-def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
-    """
-    Apply a random perturbation to a set of weights.
-    
-    Given an array of populations and probabilities, this function returns 
-    the equivalent of:
-
-    [sst.<distribution>(N, p).rvs(samples) / N for N, p in zip(N_array, p_array)]
-
-    <distribution> is binomial by default.
-
-    Parameters
-    ----------
-
-        N_array : numpy.array
-            An array of population sizes
-
-        p_array : numpy.array
-            An array of probabilities
-
-        randomization_fn : callable, jit compiled function, optional
-            A function that takes the population and a probaility and returns a 
-            randomly perturbed weight (input arguments subject to change, since
-            this is currently binomial by default).
-
-    Returns
-    -------
-
-        numpy.array : an array of random numbers of length len(N_array)
-    """
-    out = zeros(len(N_array), dtype=float64)
-    for i in numba.prange(len(N_array)):
-        out[i] = randomisation_fn(N_array[i], p_array[i])
-    return out
+       # if wait > N:
+           # return count / N_orig
+       # count += 1
+       # N -= wait
 
 
-@numba.jit(
-    nopython=True,
-    nogil=True,
-    fastmath=True,
-)
-def _wilson_interval(num, denom):
-    """
-    Returns an estimate of the variance of the overlap coefficient (and other
-    quantities that feature the some number of people divided by the total population
-    size) derived from the Wilson score interval.
+# @numba.jit(
+   # nopython=True,
+   # nogil=True,
+   # parallel=True,
+   # fastmath=True,
+# )
+# def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
+   # """
+   # Apply a random perturbation to a set of weights.
+   
+    # Given an array of populations and probabilities, this function returns 
+    # the equivalent of:
 
-    Parameters
-    ----------
+    # [sst.<distribution>(N, p).rvs(samples) / N for N, p in zip(N_array, p_array)]
 
-        num : numeric
-            the number of "successes", i.e. the numerator of the rate formula we want
-            to calculate the variance for.
+    # <distribution> is binomial by default.
 
-        denom  : numeric
-            the population size of the rate formula we want to calculate the
-            variance for.
+    # Parameters
+    # ----------
 
-    Returns
-    -------
+        # N_array : numpy.array
+            # An array of population sizes
 
-        numpy.float64 : the estimate of the variance.
-    """
+        # p_array : numpy.array
+            # An array of probabilities
 
-    z = 1.959963984540054 # this is the 2.5th/97.5th percentile of the standard normal
-    wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
-    wilson_offset = z * sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
+        # randomization_fn : callable, jit compiled function, optional
+            # A function that takes the population and a probaility and returns a 
+            # randomly perturbed weight (input arguments subject to change, since
+            # this is currently binomial by default).
 
-    return (wilson_centre - wilson_offset, wilson_centre + wilson_offset)
+    # Returns
+    # -------
+
+        # numpy.array : an array of random numbers of length len(N_array)
+    # """
+    # out = zeros(len(N_array), dtype=float64)
+    # for i in numba.prange(len(N_array)):
+        # out[i] = randomisation_fn(N_array[i], p_array[i])
+    # return out
+
+
+# @numba.jit(
+    # nopython=True,
+    # nogil=True,
+    # fastmath=True,
+# )
+# def _wilson_interval(num, denom):
+    # """
+    # Returns an estimate of the variance of the overlap coefficient (and other
+    # quantities that feature the some number of people divided by the total population
+    # size) derived from the Wilson score interval.
+
+    # Parameters
+    # ----------
+
+        # num : numeric
+            # the number of "successes", i.e. the numerator of the rate formula we want
+            # to calculate the variance for.
+
+        # denom  : numeric
+            # the population size of the rate formula we want to calculate the
+            # variance for.
+
+    # Returns
+    # -------
+
+        # numpy.float64 : the estimate of the variance.
+    # """
+
+    # z = 1.959963984540054 # this is the 2.5th/97.5th percentile of the standard normal
+    # wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
+    # wilson_offset = z * sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
+
+    # return (wilson_centre - wilson_offset, wilson_centre + wilson_offset)
     # NOTE
     # ((x + a) - (x - a)) / 2
     # = (2a) / 2
@@ -199,8 +199,8 @@ def _overlap_coefficient(data, inds, *args):
                 denom = denominator[jj]
 
 
-    wilson_ci = _wilson_interval(numerator, denom)
-    return numerator / denom, wilson_ci, denom
+    #wilson_ci = _wilson_interval(numerator, denom)
+    return numerator / denom, denom # wilson_ci was previously here.
 
 @numba.jit(
     nopython=True,
@@ -306,10 +306,10 @@ def _compute_weights(
         # This call to weight_function allows users to define their
         # own weight functions with or without the optional args.
         # :-)
-        weight, ci, denom = weight_function(data, inds, *args)
+        weight, denom = weight_function(data, inds, *args)
 
         edge_weight[index] = weight
-        edge_weight_ci[index, :] = ci
+        #edge_weight_ci[index, :] = ci
         edge_weight_population[index] = denom
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
@@ -319,18 +319,18 @@ def _compute_weights(
     node_weight_population = zeros(shape=data.shape[1] , dtype=float64)
 
     for index in numba.prange(data.shape[1]):
-        weight, ci, denom = weight_function(data, array([index]), *args)
+        weight, denom = weight_function(data, array([index]), *args)
         node_weight[index] = weight
-        node_weight_ci[index, :] = ci
+        #node_weight_ci[index, :] = ci
         node_weight_population[index] = denom
 
     return (
         incidence_matrix,
         edge_weight,
-        edge_weight_ci,
+        #edge_weight_ci,
         edge_weight_population,
         node_weight,
-        node_weight_ci,
+        #node_weight_ci,
         node_weight_population,
     )
 
@@ -521,8 +521,8 @@ class Hypergraph(object):
         self.incidence_matrix = None
         self.edge_weights = None
         self.node_weights = None
-        self.edge_weights_ci = None
-        self.node_weights_ci = None
+        #self.edge_weights_ci = None
+        #self.node_weights_ci = None
         self.edge_weights_pop = None
         self.node_weights_pop = None
         self.edge_list = None
@@ -668,10 +668,10 @@ class Hypergraph(object):
         # compute the weights
         (inc_mat_original,
         edge_weight,
-        edge_weight_ci,
+        #edge_weight_ci,
         edge_weight_pop,
         node_weight,
-        node_weight_ci,
+        #node_weight_ci,
         node_weight_pop) = _compute_weights(
             data_array,
             work_list,
@@ -686,7 +686,7 @@ class Hypergraph(object):
         inds = edge_weight > 0
         inc_mat_original = inc_mat_original[inds, :]
         edge_weight = edge_weight[inds]
-        edge_weight_ci = edge_weight_ci[inds]
+        #edge_weight_ci = edge_weight_ci[inds]
         edge_weight_pop = edge_weight_pop[inds]
         
         edge_list_out = array(edge_list_out, dtype="object")[inds].tolist()
@@ -695,10 +695,10 @@ class Hypergraph(object):
 
         self.incidence_matrix = inc_mat_original
         self.edge_weights = edge_weight
-        self.edge_weights_ci = edge_weight_ci
+        #self.edge_weights_ci = edge_weight_ci
         self.edge_weights_pop = edge_weight_pop
         self.node_weights = node_weight
-        self.node_weights_ci = node_weight_ci
+        #self.node_weights_ci = node_weight_ci
         self.node_weights_pop = node_weight_pop
         self.edge_list = edge_list_out
         self.node_list = node_list_string
@@ -711,8 +711,8 @@ class Hypergraph(object):
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
-            bootstrap_samples=1,
-            bootstrap_randomisation_function=_binomial_rvs,
+            #bootstrap_samples=1,
+            #bootstrap_randomisation_function=_binomial_rvs,
         ):
 
         """
@@ -819,26 +819,26 @@ class Hypergraph(object):
 
             eigenvector_boot = []
             eigenvalue_boot = []
-            for _ in range(bootstrap_samples):
+            #for _ in range(bootstrap_samples):
 
-                inc_mat = self.incidence_matrix
-                print(inc_mat.shape)
-                if bootstrap_samples > 1:
-                    weight = randomize_weights(
-                        self.edge_weights_pop.astype(int32), 
-                        self.edge_weights, 
-                        bootstrap_randomisation_function
-                    )
-                else:
-                    weight = self.edge_weights
+            inc_mat = self.incidence_matrix
+            #    print(inc_mat.shape)
+            #    if bootstrap_samples > 1:
+            #        weight = randomize_weights(
+            #            self.edge_weights_pop.astype(int32), 
+            #            self.edge_weights, 
+            #            bootstrap_randomisation_function
+            #        )
+            #    else:
+            weight = self.edge_weights
 
-                eig_val, eig_vec = _bipartite_eigenvector(
-                    inc_mat,
-                    weight
-                )
+            eig_val, eig_vec = _bipartite_eigenvector(
+                inc_mat,
+                weight
+            )
 
-                eigenvector_boot.append(eig_vec / eig_vec.sum())
-                eigenvalue_boot.append(eig_val)
+            eigenvector_boot.append(eig_vec / eig_vec.sum())
+            eigenvalue_boot.append(eig_val)
 
             eigenvector_boot = array(eigenvector_boot)
 
@@ -865,102 +865,102 @@ class Hypergraph(object):
         eigenvector_boot = []
         eigenvalue_boot = []
 
-        for _ in range(bootstrap_samples):
+        #for _ in range(bootstrap_samples):
 
-            # apply a perturbation to the weights. Note, we will not do this if the
-            # user has requested only 1 bootstrap iteration or if the uncertainties in the
-            # weights are set to zero.
+        # apply a perturbation to the weights. Note, we will not do this if the
+        # user has requested only 1 bootstrap iteration or if the uncertainties in the
+        # weights are set to zero.
 
-            if weighted_resultant:
-                res_weight = weight_resultant
-            else:
-                res_weight = ones_like(weight_resultant)
+        if weighted_resultant:
+            res_weight = weight_resultant
+        else:
+            res_weight = ones_like(weight_resultant)
 
-            if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
-                if weighted_resultant:
-                    res_weight = randomize_weights(
-                        resultant_pop.astype(int32), 
-                        res_weight, 
-                        bootstrap_randomisation_function
-                    )
-                weight = randomize_weights(
-                    weight_population.astype(int32), 
-                    weight_original, 
-                    bootstrap_randomisation_function
-                )
+        # if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
+           # if weighted_resultant:
+               # res_weight = randomize_weights(
+                   # resultant_pop.astype(int32), 
+                   # res_weight, 
+                    # bootstrap_randomisation_function
+                # )
+            # weight = randomize_weights(
+                # weight_population.astype(int32), 
+                # weight_original, 
+                # bootstrap_randomisation_function
+            # )
 
-            else:
-                weight = weight_original
+        #else:
+        weight = weight_original
 
-            weight_norm = norm(weight)
-            res_weight_norm = norm(res_weight)
+        weight_norm = norm(weight)
+        res_weight_norm = norm(res_weight)
 
-            # I'm not sure if we actually need to apply the normalisation to the vectors,
-            # since the eigenvector is being normalised in the end anyway. I don't think this
-            # is using that much time compared to the rest of the function so I will leave it
-            # in for now.
-            weight = weight / weight_norm
-            res_weight = res_weight / res_weight_norm
+        # I'm not sure if we actually need to apply the normalisation to the vectors,
+        # since the eigenvector is being normalised in the end anyway. I don't think this
+        # is using that much time compared to the rest of the function so I will leave it
+        # in for now.
+        weight = weight / weight_norm
+        res_weight = res_weight / res_weight_norm
 
-            inc_mat = diags(sqrt(res_weight)).dot(inc_mat_original)
-            old_eigenvector_estimate /= norm(old_eigenvector_estimate)
-            eigenvalue_estimates, eigenvalue_error_estimates = [], []
+        inc_mat = diags(sqrt(res_weight)).dot(inc_mat_original)
+        old_eigenvector_estimate /= norm(old_eigenvector_estimate)
+        eigenvalue_estimates, eigenvalue_error_estimates = [], []
 
-            # In principle, the body of this loop could be compiled with Numba.
-            # However, iterate_vector() is quadratic in long_axis_size, whereas
-            # all the other operations here are linear in it, so we are spend very
-            # little time in the rest of this loop body.
-            for iteration in range(max_iterations):
+        # In principle, the body of this loop could be compiled with Numba.
+        # However, iterate_vector() is quadratic in long_axis_size, whereas
+        # all the other operations here are linear in it, so we are spend very
+        # little time in the rest of this loop body.
+        for iteration in range(max_iterations):
+
+            if self.verbose:
+                print("\rRunning iteration {}...".format(iteration), end="")
+
+            new_eigenvector_estimate = _iterate_vector(
+                inc_mat,
+                weight,
+                old_eigenvector_estimate
+            )
+
+            # To estimate eigenvalue, take ratio of new to old eigenvector
+            # ignoring zeroes
+            mask = (new_eigenvector_estimate != 0) & (old_eigenvector_estimate != 0)
+            iter_eigenvalue_estimates = new_eigenvector_estimate[mask] / old_eigenvector_estimate[mask]
+            eigenvalue_estimate = iter_eigenvalue_estimates.mean()
+            eigenvalue_error_estimate = iter_eigenvalue_estimates.std()
+
+            eigenvalue_estimates.append(eigenvalue_estimate)
+            eigenvalue_error_estimates.append(eigenvalue_error_estimate)
+
+            if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
 
                 if self.verbose:
-                    print("\rRunning iteration {}...".format(iteration), end="")
-
-                new_eigenvector_estimate = _iterate_vector(
-                    inc_mat,
-                    weight,
-                    old_eigenvector_estimate
-                )
-
-                # To estimate eigenvalue, take ratio of new to old eigenvector
-                # ignoring zeroes
-                mask = (new_eigenvector_estimate != 0) & (old_eigenvector_estimate != 0)
-                iter_eigenvalue_estimates = new_eigenvector_estimate[mask] / old_eigenvector_estimate[mask]
-                eigenvalue_estimate = iter_eigenvalue_estimates.mean()
-                eigenvalue_error_estimate = iter_eigenvalue_estimates.std()
-
-                eigenvalue_estimates.append(eigenvalue_estimate)
-                eigenvalue_error_estimates.append(eigenvalue_error_estimate)
-
-                if eigenvalue_error_estimate / eigenvalue_estimate < tolerance:
-
-                    if self.verbose:
-                        print(
-                            "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
-                                eigenvalue_estimate,
-                                eigenvalue_error_estimate,
-                                iteration
-                            )
-                        )
-                    break
-
-                # Normalise to try to prevent overflows
-                old_eigenvector_estimate = (
-                    new_eigenvector_estimate /
-                    norm(new_eigenvector_estimate)
-                )
-
-            else:
-                if self.verbose:
-                    print("\nFailed to converge after", iteration, "iterations.")
-                    print("Last estimate was {:.2f} ± {:.4f}".format(
-                        eigenvalue_estimate,
-                        eigenvalue_error_estimate
+                    print(
+                        "\nConverged at largest eigenvalue {:.2f} ± {:.4f} after {} iterations".format(
+                            eigenvalue_estimate,
+                            eigenvalue_error_estimate,
+                            iteration
                         )
                     )
+                break
 
-            eigenvalue_boot.append(eigenvalue_estimate)
-            # we are applying a scaling to the eigenvector here, so in principle the magnitude also has meaning.
-            eigenvector_boot.append(weight_norm * res_weight_norm * new_eigenvector_estimate / norm(new_eigenvector_estimate))
+            # Normalise to try to prevent overflows
+            old_eigenvector_estimate = (
+                new_eigenvector_estimate /
+                norm(new_eigenvector_estimate)
+            )
+
+        else:
+            if self.verbose:
+                print("\nFailed to converge after", iteration, "iterations.")
+                print("Last estimate was {:.2f} ± {:.4f}".format(
+                    eigenvalue_estimate,
+                    eigenvalue_error_estimate
+                    )
+                )
+
+        eigenvalue_boot.append(eigenvalue_estimate)
+        # we are applying a scaling to the eigenvector here, so in principle the magnitude also has meaning.
+        eigenvector_boot.append(weight_norm * res_weight_norm * new_eigenvector_estimate / norm(new_eigenvector_estimate))
 
         eigenvector_boot = array(eigenvector_boot)
         return eigenvector_boot.mean(axis=0), eigenvector_boot.std(axis=0)
@@ -1029,9 +1029,73 @@ class Hypergraph(object):
 
 if __name__ == "__main__":
 
+
+    
+    @numba.jit(
+        nopython=True,
+        nogil=True,
+        fastmath=True,
+    )
+    def age_adjusted_weights(data, inds, *args):
+        """
+        This function returns a 1.0 divided by a number passed in as an optional
+        argument.
+        """
+        
+        age_weights = np.array( # European standard population 2013 weights 
+            [[0  , 4     , 0.050],
+             [5  , 9     , 0.055],
+             [10 , 14    , 0.055],
+             [15 , 19    , 0.055],
+             [20 , 24    , 0.060],
+             [25 , 29    , 0.060],
+             [30 , 34    , 0.065],
+             [35 , 39    , 0.070],
+             [40 , 44    , 0.070],
+             [45 , 49    , 0.070],
+             [50 , 54    , 0.070],
+             [55 , 59    , 0.065],
+             [60 , 64    , 0.060],
+             [65 , 69    , 0.055],
+             [70 , 74    , 0.050],
+             [75 , 79    , 0.040],
+             [80 , 84    , 0.025],
+             [85 , 90    , 0.015],
+             [90 , 94    , 0.008],
+             [95 , np.inf, 0.002]]
+        )
+        
+        
+        age_specific_numerator = np.zeros(age_weights.shape[0])
+        age_specific_denominator = np.zeros(age_weights.shape[0])
+        
+        for i in range(args[0].shape[0]):
+        
+            what_age_band = (age_weights[:, 0] <= args[0][i]) & (age_weights[:, 1] >= args[0][i])
+            
+            n_diseases = 0
+            for j in inds:
+                n_diseases += data[i, j]
+            
+            if n_diseases == len(inds):
+                age_specific_numerator[what_age_band] += args[1][i]
+                age_specific_denominator[what_age_band] += 1.0
+            
+        
+        out = 0.0
+        out_temp = 0.0
+        for i in range(age_weights.shape[0]):
+            if age_specific_denominator[i] > 0:
+                out += age_weights[i, 2] * age_specific_numerator[i] / age_specific_denominator[i]
+                out_temp += age_specific_numerator[i] / age_specific_denominator[i]
+        
+        return out, 0.0, 0.0
+
+
+
     n_people = 5000
     n_diseases = 10
-
+    
     import pandas as pd
     import numpy as np
 
@@ -1041,25 +1105,34 @@ if __name__ == "__main__":
     ).rename(
         columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
     )
+    
+    #data_age = np.random.randint(1, 100, n_people)
+    data_age = np.random.poisson(lam=50, size=n_people) # this is shit
+    data_HCRU = np.random.poisson(size=n_people)
+    
+    
+    data_array = data_pd.to_numpy().astype(uint8)
+    inds = np.array([0, 1])
+    
+    print(age_adjusted_weights(data_array, inds, data_age, data_HCRU))
+    
+    
 
-    h = Hypergraph(verbose=False)
-    h.compute_hypergraph(data_pd)
+    h = Hypergraph(verbose=True)
+    h.compute_hypergraph(
+        data_pd,
+        age_adjusted_weights,
+        data_age, data_HCRU
+    )
+
+    print(h.edge_weights)
 
     e_vec, e_vec_err = h.eigenvector_centrality(
         rep="dual",
         weighted_resultant=True,
-        bootstrap_samples=10
+        bootstrap_samples=1
     )
+    
+    print(e_vec)
 
-    print(np.linalg.norm(e_vec))
-    print()
-    print(h.edge_weights[0])
-    print(h.edge_weights_pop[0])
-    print()
-    print(e_vec[0])
-    print(e_vec_err[0])
-    print()
-    print(randomize_weights(np.ones(10) * h.edge_weights_pop[0], np.ones(10) * h.edge_weights[0]))
-
-
-
+    

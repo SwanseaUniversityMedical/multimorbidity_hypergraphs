@@ -18,9 +18,9 @@ def test_instantiated():
 
     assert h.incidence_matrix is None
     assert h.edge_weights is None
-    assert h.edge_weights_ci is None
+    #assert h.edge_weights_ci is None
     assert h.node_weights is None
-    assert h.node_weights_ci is None
+    #assert h.node_weights_ci is None
     assert h.edge_list is None
     assert h.node_list is None
 
@@ -105,7 +105,7 @@ def test_build_hypergraph_edge_weights_zero_sets():
         if exp_edge_weights[k] > 0:
             assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
 
-    assert len(h.edge_weights) == len(h.edge_weights_ci)
+    #assert len(h.edge_weights) == len(h.edge_weights_ci)
     assert len(h.edge_weights) == len(h.edge_weights_pop)
 
 
@@ -126,8 +126,8 @@ def test_build_hypergraph_edge_weights_zero_sets_custom_weights():
         argument.
         """
         if len(inds) == 3:
-            return 0.0, 0.0, 0.0
-        return 1.0, 0.0, 0.0
+            return 0.0, 0.0
+        return 1.0, 0.0
         
     data = np.array([
         [1, 0, 1, 0],
@@ -166,7 +166,7 @@ def test_build_hypergraph_edge_weights_zero_sets_custom_weights():
         if exp_edge_weights[k] > 0:
             assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
 
-    assert len(h.edge_weights) == len(h.edge_weights_ci)
+    #assert len(h.edge_weights) == len(h.edge_weights_ci)
     assert len(h.edge_weights) == len(h.edge_weights_pop)
 
 
@@ -732,7 +732,7 @@ def test_non_standard_weight_function():
         unweighted hypergraph.
         """
 
-        return 1.0, 0.0, 0.0
+        return 1.0, 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -769,7 +769,7 @@ def test_non_standard_weight_function_with_optional_arguments():
         argument.
         """
         print(args[0])
-        return 1.0 / args[0], 0.0, 0.0
+        return 1.0 / args[0], 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -805,7 +805,7 @@ def test_non_standard_weight_function_node_and_edge_weights_with_optional_argume
         argument.
         """
         print(args[0])
-        return 1.0 / args[0], 0.0, 0.0
+        return 1.0 / args[0], 0.0
 
     n_people = 5000
     n_diseases = 10
@@ -827,225 +827,220 @@ def test_non_standard_weight_function_node_and_edge_weights_with_optional_argume
 
 
 
-def test_wilson_score_uncertainties():
-    """
-    Tests to make sure the edge weight variance is calculated correctly.
-    """
+# def test_wilson_score_uncertainties():
+    # """
+    # Tests to make sure the edge weight variance is calculated correctly.
+    # """
     # Not sure I need these additional tests, since the existing tests now must
     # include the uncertainties.
     # non standard weight function with uncertainties
     # non standard weight function with optional args and uncertainties.
-    def overlap_cooef_num_denom(data, edge):
+    # def overlap_cooef_num_denom(data, edge):
 
-        denominator = data.loc[:, edge].sum().min()
-        numerator = (data.loc[:, edge].sum(axis=1) == len(edge)).sum()
+        # denominator = data.loc[:, edge].sum().min()
+        # numerator = (data.loc[:, edge].sum(axis=1) == len(edge)).sum()
 
-        return (numerator, denominator)
+        # return (numerator, denominator)
 
-    n_people = 5000
-    n_diseases = 10
+    # n_people = 5000
+    # n_diseases = 10
 
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
 
-    h = hgt.Hypergraph()
-    h.compute_hypergraph(data_pd)
+    # h = hgt.Hypergraph()
+    # h.compute_hypergraph(data_pd)
 
-    for i in range(len(h.edge_list)):
-        vals = overlap_cooef_num_denom(data_pd, h.edge_list[i])
-        wilson = smsp.proportion_confint(vals[0], vals[1], alpha=0.05, method="wilson")
-        print(wilson, h.edge_weights_ci[i])
-        assert (wilson - h.edge_weights_ci[i] < 0.001).all()
-
-# test_bootstrap_standard_rep
-# test_bootstrap_dual_rep
-# test_bootstrap_bipartite_rep
-# test_bootstrap_standard_rep_weighted_resultant
-# test_bootstrap_dual_rep_weighted_resultant
-# test_bootstrap_bipartite_rep_weighted_resultant
-
-def test_bootstrap_standard_rep():
-    """
-    Test that the bootstrapped eigenvector centrality provides an answer that is
-    close to the non bootstrapped answer (close means within 2 etimated standard
-    deviations. Standard rep
-    """
-    n_people = 5000
-    n_diseases = 10
-
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
-
-    h = hgt.Hypergraph(verbose=False)
-    h.compute_hypergraph(data_pd)
-
-    e_vec, e_vec_err = h.eigenvector_centrality()
-    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(bootstrap_samples=10)
-
-    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+    # for i in range(len(h.edge_list)):
+        # vals = overlap_cooef_num_denom(data_pd, h.edge_list[i])
+        # wilson = smsp.proportion_confint(vals[0], vals[1], alpha=0.05, method="wilson")
+        # print(wilson, h.edge_weights_ci[i])
+        # assert (wilson - h.edge_weights_ci[i] < 0.001).all()
 
 
-def test_bootstrap_dual_rep():
-    """
-    Test that the bootstrapped eigenvector centrality provides an answer that is
-    close to the non bootstrapped answer (close means within 2 etimated standard
-    deviations. Dual rep
-    """
-    n_people = 5000
-    n_diseases = 10
 
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
+# def test_bootstrap_standard_rep():
+    # """
+    # Test that the bootstrapped eigenvector centrality provides an answer that is
+    # close to the non bootstrapped answer (close means within 2 etimated standard
+    # deviations. Standard rep
+    # """
+    # n_people = 5000
+    # n_diseases = 10
 
-    h = hgt.Hypergraph(verbose=False)
-    h.compute_hypergraph(data_pd)
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
 
-    e_vec, e_vec_err = h.eigenvector_centrality(rep="dual")
-    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="dual", bootstrap_samples=10)
+    # h = hgt.Hypergraph(verbose=False)
+    # h.compute_hypergraph(data_pd)
 
-    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+    # e_vec, e_vec_err = h.eigenvector_centrality()
+    # e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(bootstrap_samples=10)
+
+    # np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
 
 
-def test_bootstrap_bipartite_rep():
-    """
-    Test that the bootstrapped eigenvector centrality provides an answer that is
-    close to the non bootstrapped answer (close means within 2 etimated standard
-    deviations. Bipartite rep
-    """
-    n_people = 5000
-    n_diseases = 10
+# def test_bootstrap_dual_rep():
+    # """
+    # Test that the bootstrapped eigenvector centrality provides an answer that is
+    # close to the non bootstrapped answer (close means within 2 etimated standard
+    # deviations. Dual rep
+    # """
+    # n_people = 5000
+    # n_diseases = 10
 
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
 
-    h = hgt.Hypergraph(verbose=False)
-    h.compute_hypergraph(data_pd)
+    # h = hgt.Hypergraph(verbose=False)
+    # h.compute_hypergraph(data_pd)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(rep="bipartite")
-    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="bipartite", bootstrap_samples=10)
+    # e_vec, e_vec_err = h.eigenvector_centrality(rep="dual")
+    # e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="dual", bootstrap_samples=10)
 
-    tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
+    # np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
+
+
+# def test_bootstrap_bipartite_rep():
+    # """
+    # Test that the bootstrapped eigenvector centrality provides an answer that is
+    # close to the non bootstrapped answer (close means within 2 etimated standard
+    # deviations. Bipartite rep
+    # """
+    # n_people = 5000
+    # n_diseases = 10
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph(verbose=False)
+    # h.compute_hypergraph(data_pd)
+
+    # e_vec, e_vec_err = h.eigenvector_centrality(rep="bipartite")
+    # e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(rep="bipartite", bootstrap_samples=10)
+
+    # tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
 
     # This is a bit hacky...
     # Since bootstrapping is statistical, we would expect the difference to be
     # greater than twice the standard deviation about 5% of the time (if the
     # eigenvector elements are normally distributed)
-    assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
+    # assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
 
 
-def test_bootstrap_standard_rep_weighted_resultant():
-    """
-    Test that the bootstrapped eigenvector centrality provides an answer that is
-    close to the non bootstrapped answer (close means within 2 etimated standard
-    deviations. Standard rep, weighted resultant.
-    """
-    n_people = 5000
-    n_diseases = 10
+# def test_bootstrap_standard_rep_weighted_resultant():
+    # """
+    # Test that the bootstrapped eigenvector centrality provides an answer that is
+    # close to the non bootstrapped answer (close means within 2 etimated standard
+    # deviations. Standard rep, weighted resultant.
+    # """
+    # n_people = 5000
+    # n_diseases = 10
 
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
 
-    h = hgt.Hypergraph(verbose=False)
-    h.compute_hypergraph(data_pd)
+    # h = hgt.Hypergraph(verbose=False)
+    # h.compute_hypergraph(data_pd)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(weighted_resultant=True)
-    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(
-        weighted_resultant=True,
-        bootstrap_samples=10
-    )
+    # e_vec, e_vec_err = h.eigenvector_centrality(weighted_resultant=True)
+    # e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(
+        # weighted_resultant=True,
+        # bootstrap_samples=10
+    # )
 
-    np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
-
-
-def test_bootstrap_dual_rep_weighted_resultant():
-    """
-    Test that the bootstrapped eigenvector centrality provides an answer that is
-    close to the non bootstrapped answer (close means within 2 etimated standard
-    deviations. Dual rep, weighted resultant.
-    """
-    n_people = 5000
-    n_diseases = 10
-
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
-
-    h = hgt.Hypergraph(verbose=False)
-    h.compute_hypergraph(data_pd)
-
-    e_vec, e_vec_err = h.eigenvector_centrality(rep="dual", weighted_resultant=True)
-    e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(
-        rep="dual",
-        weighted_resultant=True,
-        bootstrap_samples=10
-    )
-
-    tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
-    assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
+    # np.testing.assert_array_less(np.abs(e_vec - e_vec_boot), 2 * np.sqrt(e_vec_err_boot))
 
 
-def test_binomial_random_numbers():
+# def test_bootstrap_dual_rep_weighted_resultant():
+    # """
+    # Test that the bootstrapped eigenvector centrality provides an answer that is
+    # close to the non bootstrapped answer (close means within 2 etimated standard
+    # deviations. Dual rep, weighted resultant.
+    # """
+    # n_people = 5000
+    # n_diseases = 10
 
-    N = 50000
-    p = 0.001
-    samples = 1000
-    iterations = 500
-    p_values = np.zeros(iterations)
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
 
-    for i in range(iterations):
-        calc = hgt.randomize_weights(np.ones(samples) * N, np.ones(samples) * p)
-        expected = sst.binom(N, p).rvs(samples) / N
-        res = sst.ks_2samp(expected, calc)
-        p_values[i] = res[1]
+    # h = hgt.Hypergraph(verbose=False)
+    # h.compute_hypergraph(data_pd)
+
+    # e_vec, e_vec_err = h.eigenvector_centrality(rep="dual", weighted_resultant=True)
+    # e_vec_boot, e_vec_err_boot = h.eigenvector_centrality(
+        # rep="dual",
+        # weighted_resultant=True,
+        # bootstrap_samples=10
+    # )
+
+    # tests = np.abs(e_vec - e_vec_boot) < 2 * np.sqrt(e_vec_err_boot)
+    # assert len(e_vec) - np.sum(tests) < 0.05 * len(e_vec)
+
+
+# def test_binomial_random_numbers():
+
+    # N = 50000
+    # p = 0.001
+    # samples = 1000
+    # iterations = 500
+    # p_values = np.zeros(iterations)
+
+    # for i in range(iterations):
+        # calc = hgt.randomize_weights(np.ones(samples) * N, np.ones(samples) * p)
+        # expected = sst.binom(N, p).rvs(samples) / N
+        # res = sst.ks_2samp(expected, calc)
+        # p_values[i] = res[1]
 
 
     # NOTE. This is checking <iterations> distributions at the 5% significance level.
     # i.e. at most 5% of <iterations> tests will have a p-value less than 0.05
-    assert np.sum(p_values < 0.05) / iterations < 0.05
+    # assert np.sum(p_values < 0.05) / iterations < 0.05
 
 
-def test_user_specified_random_number_function():
+# def test_user_specified_random_number_function():
 
-    @numba.jit(
-        nopython=True,
-        nogil=True,
-        fastmath=True,
-    )
-    def not_random_at_all(N, p):
-        """
-        This function returns a 1.0
-        """
-        return 1.0
+    # @numba.jit(
+        # nopython=True,
+        # nogil=True,
+        # fastmath=True,
+    # )
+    # def not_random_at_all(N, p):
+        # """
+        # This function returns a 1.0
+        # """
+        # return 1.0
         
-    samples = 1000
+    # samples = 1000
 
-    calc = hgt.randomize_weights(np.random.rand(samples), np.random.rand(samples), randomisation_fn=not_random_at_all)
-    print(calc)
+    # calc = hgt.randomize_weights(np.random.rand(samples), np.random.rand(samples), randomisation_fn=not_random_at_all)
+    # print(calc)
     
-    assert np.all(calc == 1)
+    # assert np.all(calc == 1)
 
 
 
