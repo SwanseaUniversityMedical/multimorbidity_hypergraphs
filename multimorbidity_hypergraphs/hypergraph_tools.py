@@ -62,8 +62,6 @@ def _overlap_coefficient(data, inds, *args):
 
         numpy.float64 : The calculated overlap coefficient.
 
-        numpy.float64 : The calculated confidence interval in the overlap coefficient.
-
         numpy.float64 : The denominator used to calculate the overlap coefficient.
 
     """
@@ -152,10 +150,6 @@ def _compute_weights(
             that contains the calculated edge weights.
 
         numpy.array
-            The edge weight confidence interval vector, a one dimensional array of
-            length n_edges that contains the calculated variances in the edge weights.
-
-        numpy.array
             The edge weight population vector, a one dimensional array of length n_edges
             that contains the population sizes used in the calculation of the the edge
             weights.
@@ -163,10 +157,6 @@ def _compute_weights(
         numpy.array
             The node weight vector, a one dimensional array of length n_nodes
             that contains the calculated node weights.
-
-        numpy.array
-            The node weight confidence interval vector, a one dimensional array of
-            length n_nodes that contains the calculated variances in the node weights.
 
         numpy.array
             The node weight population vector, a one dimensional array of length n_nodes
@@ -470,17 +460,9 @@ class Hypergraph(object):
                 The edge weight vector, a one dimensional array of length n_edges
                 that contains the calculated edge weights.
 
-            edge_weights_ci : numpy.array
-                The edge weight confidence interval vector, a one dimensional array of
-                length n_edges that contains the calculated variances in the edge weights.
-
             node_weights : numpy.array
                 The node weight vector, a one dimensional array of length n_nodes
                 that contains the calculated node weights.
-
-            node_weights_ci : numpy.array
-                The node weight confidence interval vector, a one dimensional array of
-                length n_nodes that contains the calculated variances in the node weights.
 
             edge_list : list
                 The edge list, a list of edges each element of which is a tuple of strings
@@ -651,18 +633,8 @@ class Hypergraph(object):
             random_seed : int, optional
                 The random seed to use in generating the initial vector (default: 12345)
 
-            bootstrap_samples : int, optional
-                The number of bootstrap samples to use to estimate the uncertainties in the
-                eigenvector centrality. (default: 1)
-
         Returns
         -------
-
-            float
-                The calculated largest eigenvalue of the adjacency matrix
-
-            float
-                The calculated error in the eigenvalue
 
             numpy.array
                 the eigenvector centrality of the hypergraph. The order of the elements is
@@ -700,8 +672,8 @@ class Hypergraph(object):
             # the adjacency matrix is sparse, so we can use a sparse matrix
             # datatype and compute the eigevector directly
 
-            eigenvector_boot = []
-            eigenvalue_boot = []
+            #eigenvector_boot = []
+            #eigenvalue_boot = []
 
             inc_mat = self.incidence_matrix
             weight = self.edge_weights
@@ -711,12 +683,10 @@ class Hypergraph(object):
                 weight
             )
 
-            eigenvector_boot.append(eig_vec / eig_vec.sum())
-            eigenvalue_boot.append(eig_val)
+            eigenvector = array(eig_vec / eig_vec.sum())
+            eigenvalue = eig_val
 
-            eigenvector_boot = array(eigenvector_boot)
-
-            return eigenvector_boot.mean(axis=0), eigenvector_boot.std(axis=0)
+            return eigenvector# , eigenvector_boot.std(axis=0)
 
         else:
             raise Exception("Representation not supported.")
@@ -735,9 +705,6 @@ class Hypergraph(object):
             )
 
         # 2) do the Chebyshev
-
-        eigenvector_boot = []
-        eigenvalue_boot = []
 
         if weighted_resultant:
             res_weight = weight_resultant
@@ -812,12 +779,11 @@ class Hypergraph(object):
                     )
                 )
 
-        eigenvalue_boot.append(eigenvalue_estimate)
+        eigenvalue = eigenvalue_estimate
         # we are applying a scaling to the eigenvector here, so in principle the magnitude also has meaning.
-        eigenvector_boot.append(weight_norm * res_weight_norm * new_eigenvector_estimate / norm(new_eigenvector_estimate))
+        eigenvector = array(weight_norm * res_weight_norm * new_eigenvector_estimate / norm(new_eigenvector_estimate))
 
-        eigenvector_boot = array(eigenvector_boot)
-        return eigenvector_boot.mean(axis=0), eigenvector_boot.std(axis=0)
+        return eigenvector
 
 
     def degree_centrality(

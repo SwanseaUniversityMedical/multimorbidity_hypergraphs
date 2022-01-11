@@ -302,7 +302,7 @@ def test_calculate_EVC_standard_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(tolerance=tolerance)
+    e_vec = h.eigenvector_centrality(tolerance=tolerance)
 
     # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
@@ -362,7 +362,7 @@ def test_weighted_resultant_EVC_standard_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(tolerance=tolerance, weighted_resultant=True)
+    e_vec = h.eigenvector_centrality(tolerance=tolerance, weighted_resultant=True)
 
     # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
@@ -408,7 +408,7 @@ def test_calculate_EVC_dual_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(
+    e_vec = h.eigenvector_centrality(
         rep="dual",
         tolerance=tolerance
     )
@@ -464,7 +464,7 @@ def test_weighted_resultant_EVC_dual_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(
+    e_vec = h.eigenvector_centrality(
         rep="dual",
         weighted_resultant=True,
         tolerance=tolerance
@@ -518,7 +518,7 @@ def test_calculate_EVC_bipartite_hypergraph():
     assert (exp_evec > 0).all() | (exp_evec < 0).all()
     exp_evec = np.abs(exp_evec)
 
-    e_vec, e_vec_err = h.eigenvector_centrality(
+    e_vec = h.eigenvector_centrality(
         rep="bipartite",
         tolerance=tolerance
     )
