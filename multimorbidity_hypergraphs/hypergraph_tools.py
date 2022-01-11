@@ -578,6 +578,7 @@ class Hypergraph(object):
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
+            normalisation="elements"
         ):
 
         """
@@ -632,6 +633,13 @@ class Hypergraph(object):
 
             random_seed : int, optional
                 The random seed to use in generating the initial vector (default: 12345)
+            
+            normalisation : string, optional
+                The method to use for normalising the eigenvector. The options are 
+                "elements" - normalises by the theoretical maximum number of edges in the 
+                graph
+                "unit" - normalises the eigenvector so it has length one. 
+                (default: "elements")
 
         Returns
         -------
@@ -658,6 +666,8 @@ class Hypergraph(object):
             weight_population = self.edge_weights_pop
             weight_resultant = self.node_weights
             resultant_pop = self.node_weights_pop
+            
+            n_nodes = len(self.node_list)
         elif rep == "dual":
             inc_mat_original = self.incidence_matrix
             old_eigenvector_estimate = rng.random(self.incidence_matrix.shape[0], dtype='float64')
@@ -666,14 +676,13 @@ class Hypergraph(object):
             weight_population = self.node_weights_pop
             weight_resultant = self.edge_weights
             resultant_pop = self.edge_weights_pop
+            
+            n_nodes = 2 ** len(self.node_list) - len(self.node_list) - 2
         elif rep == "bipartite":
 
             # We treat the bipartite representation differently -
             # the adjacency matrix is sparse, so we can use a sparse matrix
             # datatype and compute the eigevector directly
-
-            #eigenvector_boot = []
-            #eigenvalue_boot = []
 
             inc_mat = self.incidence_matrix
             weight = self.edge_weights
@@ -683,10 +692,17 @@ class Hypergraph(object):
                 weight
             )
 
-            eigenvector = array(eig_vec / eig_vec.sum())
+            if normalisation == "elements":
+                norm_factor = sqrt(2 ** len(self.node_list) - 2)
+            elif normalisation == "unit":
+                norm_factor = norm(eig_vec)
+            else:
+                raise Exception("Normalisation method not supported.")
+
+            eigenvector = array(eig_vec / norm_factor)
             eigenvalue = eig_val
 
-            return eigenvector# , eigenvector_boot.std(axis=0)
+            return eigenvector
 
         else:
             raise Exception("Representation not supported.")
@@ -780,8 +796,15 @@ class Hypergraph(object):
                 )
 
         eigenvalue = eigenvalue_estimate
-        # we are applying a scaling to the eigenvector here, so in principle the magnitude also has meaning.
-        eigenvector = array(weight_norm * res_weight_norm * new_eigenvector_estimate / norm(new_eigenvector_estimate))
+    
+        if normalisation == "elements":
+            norm_factor = sqrt(n_nodes)
+        elif normalisation == "unit":
+            norm_factor = norm(eig_vec)
+        else:
+            raise Exception("Normalisation method not supported.")        
+        
+        eigenvector = array(new_eigenvector_estimate / norm_factor)
 
         return eigenvector
 
