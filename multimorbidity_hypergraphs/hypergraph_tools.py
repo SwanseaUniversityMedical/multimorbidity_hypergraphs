@@ -29,108 +29,6 @@ from time import time
 ##########################################
 ## Numba compiled functions here
 
-# @numba.jit(
-   # nopython=True,
-   # nogil=True,
-   # fastmath=True,
-# )
-# def _binomial_rvs(N, p):
-   # """
-   # Generates a single random rate from a binomial distribution given
-   # a population size and a probability.
-   # """
-   # N_orig = N
-   # count = 0
-   # while True:
-       # wait = ceil(log(random.rand()) / log(1-p))
-
-       # if wait > N:
-           # return count / N_orig
-       # count += 1
-       # N -= wait
-
-
-# @numba.jit(
-   # nopython=True,
-   # nogil=True,
-   # parallel=True,
-   # fastmath=True,
-# )
-# def randomize_weights(N_array, p_array, randomisation_fn=_binomial_rvs):
-   # """
-   # Apply a random perturbation to a set of weights.
-   
-    # Given an array of populations and probabilities, this function returns 
-    # the equivalent of:
-
-    # [sst.<distribution>(N, p).rvs(samples) / N for N, p in zip(N_array, p_array)]
-
-    # <distribution> is binomial by default.
-
-    # Parameters
-    # ----------
-
-        # N_array : numpy.array
-            # An array of population sizes
-
-        # p_array : numpy.array
-            # An array of probabilities
-
-        # randomization_fn : callable, jit compiled function, optional
-            # A function that takes the population and a probaility and returns a 
-            # randomly perturbed weight (input arguments subject to change, since
-            # this is currently binomial by default).
-
-    # Returns
-    # -------
-
-        # numpy.array : an array of random numbers of length len(N_array)
-    # """
-    # out = zeros(len(N_array), dtype=float64)
-    # for i in numba.prange(len(N_array)):
-        # out[i] = randomisation_fn(N_array[i], p_array[i])
-    # return out
-
-
-# @numba.jit(
-    # nopython=True,
-    # nogil=True,
-    # fastmath=True,
-# )
-# def _wilson_interval(num, denom):
-    # """
-    # Returns an estimate of the variance of the overlap coefficient (and other
-    # quantities that feature the some number of people divided by the total population
-    # size) derived from the Wilson score interval.
-
-    # Parameters
-    # ----------
-
-        # num : numeric
-            # the number of "successes", i.e. the numerator of the rate formula we want
-            # to calculate the variance for.
-
-        # denom  : numeric
-            # the population size of the rate formula we want to calculate the
-            # variance for.
-
-    # Returns
-    # -------
-
-        # numpy.float64 : the estimate of the variance.
-    # """
-
-    # z = 1.959963984540054 # this is the 2.5th/97.5th percentile of the standard normal
-    # wilson_centre = (num + 0.5 * z ** 2) / (denom + z ** 2)
-    # wilson_offset = z * sqrt(num * (denom - num) / denom + z ** 2 / 4) / (denom + z ** 2)
-
-    # return (wilson_centre - wilson_offset, wilson_centre + wilson_offset)
-    # NOTE
-    # ((x + a) - (x - a)) / 2
-    # = (2a) / 2
-    # = a
-
-
 @numba.jit(
     nopython=True,
     nogil=True,
@@ -198,9 +96,7 @@ def _overlap_coefficient(data, inds, *args):
             if denominator[jj] < denom:
                 denom = denominator[jj]
 
-
-    #wilson_ci = _wilson_interval(numerator, denom)
-    return numerator / denom, denom # wilson_ci was previously here.
+    return numerator / denom, denom
 
 @numba.jit(
     nopython=True,
@@ -309,7 +205,6 @@ def _compute_weights(
         weight, denom = weight_function(data, inds, *args)
 
         edge_weight[index] = weight
-        #edge_weight_ci[index, :] = ci
         edge_weight_population[index] = denom
         for jj in range(n_diseases):
             incidence_matrix[index, inds[jj]] = 1
@@ -321,16 +216,13 @@ def _compute_weights(
     for index in numba.prange(data.shape[1]):
         weight, denom = weight_function(data, array([index]), *args)
         node_weight[index] = weight
-        #node_weight_ci[index, :] = ci
         node_weight_population[index] = denom
 
     return (
         incidence_matrix,
         edge_weight,
-        #edge_weight_ci,
         edge_weight_population,
         node_weight,
-        #node_weight_ci,
         node_weight_population,
     )
 
@@ -521,8 +413,6 @@ class Hypergraph(object):
         self.incidence_matrix = None
         self.edge_weights = None
         self.node_weights = None
-        #self.edge_weights_ci = None
-        #self.node_weights_ci = None
         self.edge_weights_pop = None
         self.node_weights_pop = None
         self.edge_list = None
@@ -668,10 +558,8 @@ class Hypergraph(object):
         # compute the weights
         (inc_mat_original,
         edge_weight,
-        #edge_weight_ci,
         edge_weight_pop,
         node_weight,
-        #node_weight_ci,
         node_weight_pop) = _compute_weights(
             data_array,
             work_list,
@@ -686,7 +574,6 @@ class Hypergraph(object):
         inds = edge_weight > 0
         inc_mat_original = inc_mat_original[inds, :]
         edge_weight = edge_weight[inds]
-        #edge_weight_ci = edge_weight_ci[inds]
         edge_weight_pop = edge_weight_pop[inds]
         
         edge_list_out = array(edge_list_out, dtype="object")[inds].tolist()
@@ -695,10 +582,8 @@ class Hypergraph(object):
 
         self.incidence_matrix = inc_mat_original
         self.edge_weights = edge_weight
-        #self.edge_weights_ci = edge_weight_ci
         self.edge_weights_pop = edge_weight_pop
         self.node_weights = node_weight
-        #self.node_weights_ci = node_weight_ci
         self.node_weights_pop = node_weight_pop
         self.edge_list = edge_list_out
         self.node_list = node_list_string
@@ -711,8 +596,6 @@ class Hypergraph(object):
             tolerance=1e-6,
             max_iterations=100,
             random_seed=12345,
-            #bootstrap_samples=1,
-            #bootstrap_randomisation_function=_binomial_rvs,
         ):
 
         """
@@ -819,17 +702,8 @@ class Hypergraph(object):
 
             eigenvector_boot = []
             eigenvalue_boot = []
-            #for _ in range(bootstrap_samples):
 
             inc_mat = self.incidence_matrix
-            #    print(inc_mat.shape)
-            #    if bootstrap_samples > 1:
-            #        weight = randomize_weights(
-            #            self.edge_weights_pop.astype(int32), 
-            #            self.edge_weights, 
-            #            bootstrap_randomisation_function
-            #        )
-            #    else:
             weight = self.edge_weights
 
             eig_val, eig_vec = _bipartite_eigenvector(
@@ -865,31 +739,11 @@ class Hypergraph(object):
         eigenvector_boot = []
         eigenvalue_boot = []
 
-        #for _ in range(bootstrap_samples):
-
-        # apply a perturbation to the weights. Note, we will not do this if the
-        # user has requested only 1 bootstrap iteration or if the uncertainties in the
-        # weights are set to zero.
-
         if weighted_resultant:
             res_weight = weight_resultant
         else:
             res_weight = ones_like(weight_resultant)
 
-        # if bootstrap_samples > 1: # only perturb the weights if there is more than one sample
-           # if weighted_resultant:
-               # res_weight = randomize_weights(
-                   # resultant_pop.astype(int32), 
-                   # res_weight, 
-                    # bootstrap_randomisation_function
-                # )
-            # weight = randomize_weights(
-                # weight_population.astype(int32), 
-                # weight_original, 
-                # bootstrap_randomisation_function
-            # )
-
-        #else:
         weight = weight_original
 
         weight_norm = norm(weight)
@@ -1089,7 +943,7 @@ if __name__ == "__main__":
                 out += age_weights[i, 2] * age_specific_numerator[i] / age_specific_denominator[i]
                 out_temp += age_specific_numerator[i] / age_specific_denominator[i]
         
-        return out, 0.0, 0.0
+        return out, 0.0
 
 
 
@@ -1130,7 +984,6 @@ if __name__ == "__main__":
     e_vec, e_vec_err = h.eigenvector_centrality(
         rep="dual",
         weighted_resultant=True,
-        bootstrap_samples=1
     )
     
     print(e_vec)
