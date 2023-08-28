@@ -4,13 +4,19 @@
 //#[allow(unused_imports)]
 // done
 
-use ndarray::prelude::*;
-use ndarray::{Array2, ArrayView1};
+//use ndarray::prelude::*;
+use ndarray::{array, Array2, ArrayView1};
 use itertools::Itertools;
 
 use std::collections::HashSet;
+//use std::convert::From;
 
-fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<u8>> {
+
+/*fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}*/
+
+fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
 		let mut out = HashSet::new();
 		let indices = data_row
@@ -20,10 +26,12 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<u8>> {
 			.map(|(index, _)| index)
 			.collect::<Vec<_>>();
 		
-		// For some reason that I don't understand, this line is not working
-		// A version of this works on the playground, so no idea for now. 
-		let combs = indices.into_iter().combinations(2);
-		
+
+		for ii in 2..(indices.len()+1) {
+			let combs = indices.clone().into_iter().combinations(ii).collect::<HashSet<_>>();
+			out.extend(combs);
+		}
+
 		out
 }
 
