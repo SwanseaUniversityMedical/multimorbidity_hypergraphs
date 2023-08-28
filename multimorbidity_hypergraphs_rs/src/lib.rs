@@ -1,7 +1,7 @@
 
 // directives to be used during development only. 
-//#[allow(dead_code)]
-//#[allow(unused_imports)]
+#[allow(dead_code)]
+#[allow(unused_imports)]
 // done
 
 //use ndarray::prelude::*;
@@ -18,25 +18,25 @@ use std::collections::HashSet;
 
 fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
-		let mut out = HashSet::new();
-		let indices = data_row
-			.iter()
-			.enumerate()
-			.filter(|(_, &r)| r >= 1)
-			.map(|(index, _)| index)
-			.collect::<Vec<_>>();
-		
+	let mut out = HashSet::new();
+	let indices = data_row
+		.iter()
+		.enumerate()
+		.filter(|(_, &r)| r >= 1)
+		.map(|(index, _)| index)
+		.collect::<Vec<_>>();
+	
 
-		for ii in 2..(indices.len()+1) {
-			let combs = indices
-				.clone()
-				.into_iter()
-				.combinations(ii)
-				.collect::<HashSet<_>>();
-			out.extend(combs);
-		}
+	for ii in 2..(indices.len()+1) {
+		let combs = indices
+			.clone()
+			.into_iter()
+			.combinations(ii)
+			.collect::<HashSet<_>>();
+		out.extend(combs);
+	}
 
-		out
+	out
 }
 
 
@@ -95,6 +95,52 @@ mod tests {
 		);
 		
 	}
+	
+	#[test]
+	fn reduced_powerset_singleton_t() {
+		// Not part of the python implementation
+		// Tests the function to construct the reduced powerset
+		
+		let data: Array2<u8> = array![
+			[1, 0, 1, 0],
+			[0, 1, 0, 0],
+			[0, 1, 0, 1],
+			[0, 1, 1, 1],
+			[1, 1, 1, 1]
+		];
+		
+		let mut expected = HashSet::new();
+		expected.insert(vec![0,2]);
+		
+		assert_eq!(
+			reduced_powerset(data.row(0)),
+			expected
+		);
+		
+	}
+	
+	#[test]
+	fn reduced_powerset_emptyset_t() {
+		// Not part of the python implementation
+		// Tests the function to construct the reduced powerset
+		
+		let data: Array2<u8> = array![
+			[1, 0, 1, 0],
+			[0, 1, 0, 0],
+			[0, 1, 0, 1],
+			[0, 1, 1, 1],
+			[1, 1, 1, 1]
+		];
+		
+		let expected = HashSet::new();
+		
+		assert_eq!(
+			reduced_powerset(data.row(1)),
+			expected
+		);
+		
+	}
+		
 	
 	/*
 	#[test]
