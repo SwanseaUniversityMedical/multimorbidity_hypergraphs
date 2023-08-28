@@ -28,7 +28,11 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 		
 
 		for ii in 2..(indices.len()+1) {
-			let combs = indices.clone().into_iter().combinations(ii).collect::<HashSet<_>>();
+			let combs = indices
+				.clone()
+				.into_iter()
+				.combinations(ii)
+				.collect::<HashSet<_>>();
 			out.extend(combs);
 		}
 
