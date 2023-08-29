@@ -5,7 +5,7 @@
 // done
 
 //use ndarray::prelude::*;
-use ndarray::{array, Array2, ArrayView1, Axis};
+use ndarray::{array, s, Array2, ArrayView1, ArrayView2, Axis};
 use itertools::Itertools;
 
 use std::collections::HashSet;
@@ -16,27 +16,24 @@ use std::collections::HashSet;
     println!("{}", std::any::type_name::<T>())
 }*/
 
+
+fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
+    
+    data
+        .axis_iter(Axis(0))
+        .filter(|data_row| usize::from(data_row.sum()) == data_row.len())
+        .count() as f32 / 
+    data
+        .axis_iter(Axis(1))
+        .map(|x| x.sum())
+        .min()
+        .unwrap() as f32
+    // NOTE(jim): .fold may be faster than .filter.count
+       
+}
+
 fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
-/*
-    let mut out = HashSet::new();
-    let indices = data_row
-        .iter()
-        .enumerate()
-        .filter(|(_, &r)| r >= 1)
-        .map(|(index, _)| index)
-        .collect::<Vec<_>>();
-    
-
-    for ii in 2..(indices.len()+1) {
-        let combs = indices
-            .clone()
-            .into_iter()
-            .combinations(ii)
-            .collect::<HashSet<_>>();
-        out.extend(combs);
-    }
-*/
     // more functional approach. Test for speed later?
     // don't foget automatic returns
 	(2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
@@ -205,13 +202,25 @@ mod tests {
         
     }
     
-    /*
+    
     #[test]
-    fn compute_weights_t() {
+    fn overlap_coefficient_t() {
         // Not part of the python implementation
-        // Tests the computation of the weights
+        // Tests the computation of the overlap coefficient
         
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];
+        
+        assert_eq!(
+            overlap_coefficient(data.slice(s![.., 1..=2])),
+            2.0 / 3.0
+        );
         
     }
-    */
+    
 }
