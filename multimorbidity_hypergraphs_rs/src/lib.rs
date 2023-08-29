@@ -18,6 +18,7 @@ use std::collections::HashSet;
 
 fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
+/*
     let mut out = HashSet::new();
     let indices = data_row
         .iter()
@@ -35,8 +36,21 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
             .collect::<HashSet<_>>();
         out.extend(combs);
     }
-
-    out
+*/
+    // more functional approach. Test for speed later?
+    // don't foget automatic returns
+	(2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
+	    .map(|ii| 
+    	    data_row
+    		.iter()
+    		.enumerate()
+    		.filter(|(_, &r)| r >= 1)
+    		.map(|(index, _)| index)
+    		.combinations(ii)
+    		.collect::<HashSet<_>>()
+    	)
+    	.flatten()
+    	.collect::<HashSet<_>>()
 }
 
 fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
