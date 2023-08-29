@@ -55,19 +55,12 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
 fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
     
-    let mut out = HashSet::new();
-    
-    // We're going to convert the full dataset to a HashSet, which 
-    // will only keep the unique rows to construct the edge list.
-    let data_set = data
+    // More functional programming... 
+    data
         .axis_iter(Axis(0))
-        .collect::<HashSet<_>>();
-    
-    for ii in data_set.into_iter() {
-        out.extend(reduced_powerset(ii));
-    }
-    
-    out
+        .map(|x| reduced_powerset(x))
+        .flatten()
+        .collect::<HashSet<_>>()
     
 }
 
