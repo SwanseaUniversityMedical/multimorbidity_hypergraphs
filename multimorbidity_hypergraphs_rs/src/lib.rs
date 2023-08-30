@@ -19,23 +19,38 @@ use std::collections::HashSet;
 
 fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
     
-	let denom = data
-        .axis_iter(Axis(1))
-        .map(|x| x.sum())
-        .min()
-        .unwrap() as f32;
-		
-	if denom < 0.5 { 
-	// NOTE(jim): this is an integer count cast to a f32, so if it's less than 
-	// 1.0 - eps it's zero and the code should panic.
-		panic!("overlap_coefficient: denominator is zero.");
-	}
-	
-    data
-        .axis_iter(Axis(0))
-        .filter(|data_row| usize::from(data_row.sum()) == data_row.len())
-        .count() as f32 / denom
-    // NOTE(jim): .fold may be faster than .filter.count
+    
+    match data.ncols() {
+        
+        1 => {
+            data
+                .iter()
+                .sum::<u8>() as f32 / 
+            data.nrows() as f32
+        }
+    
+        
+        _ => {
+            let denom = data
+                .axis_iter(Axis(1))
+                .map(|x| x.sum())
+                .min()
+                .unwrap() as f32;
+                
+            if denom < 0.5 { 
+            // NOTE(jim): this is an integer count cast to a f32, so if it's less than 
+            // 1.0 - eps it's zero and the code should panic.
+                panic!("overlap_coefficient: denominator is zero.");
+            }
+            
+            data
+                .axis_iter(Axis(0))
+                .filter(|data_row| usize::from(data_row.sum()) == data_row.len())
+                .count() as f32 / denom
+            // NOTE(jim): .fold may be faster than .filter.count
+        }
+    
+    }
        
 }
 
@@ -43,18 +58,18 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
     // more functional approach. Test for speed later?
     // don't foget automatic returns
-	(2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
-	    .map(|ii| 
-    	    data_row
-    		.iter()
-    		.enumerate()
-    		.filter(|(_, &r)| r >= 1)
-    		.map(|(index, _)| index)
-    		.combinations(ii)
-    		.collect::<HashSet<_>>()
-    	)
-    	.flatten()
-    	.collect::<HashSet<_>>()
+    (2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
+        .map(|ii| 
+            data_row
+            .iter()
+            .enumerate()
+            .filter(|(_, &r)| r >= 1)
+            .map(|(index, _)| index)
+            .combinations(ii)
+            .collect::<HashSet<_>>()
+        )
+        .flatten()
+        .collect::<HashSet<_>>()
 }
 
 fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
@@ -214,10 +229,10 @@ mod tests {
         );
         
     }
-	
-	
+    
+    
     #[test]
-	#[should_panic]
+    #[should_panic]
     fn overlap_coefficient_divide_by_zero_t() {
         // Not part of the python implementation
         // Tests the computation of the overlap coefficient
@@ -234,4 +249,35 @@ mod tests {
         
     }
     
+    #[test]
+    fn overlap_coefficient_one_column_prevalence_t() {
+        // Not part of the python implementation
+        // Tests the computation of the overlap coefficient
+        
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];
+        
+        assert_eq!(
+            overlap_coefficient(data.slice(s![.., 1..2])),
+            4.0 / 5.0
+        );
+        
+    }
+
+    #[test]
+    #[should_panic]
+    fn overlap_coefficient_one_column_divide_by_zero_t() {
+        // Not part of the python implementation
+        // Tests the computation of the overlap coefficient
+        
+        let data = array![[]];
+        
+        overlap_coefficient(data.slice(s![.., ..]));
+        
+    }
 }
