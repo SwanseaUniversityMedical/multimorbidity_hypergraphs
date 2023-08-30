@@ -19,15 +19,22 @@ use std::collections::HashSet;
 
 fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
     
-    data
-        .axis_iter(Axis(0))
-        .filter(|data_row| usize::from(data_row.sum()) == data_row.len())
-        .count() as f32 / 
-    data
+	let denom = data
         .axis_iter(Axis(1))
         .map(|x| x.sum())
         .min()
-        .unwrap() as f32
+        .unwrap() as f32;
+		
+	if denom < 0.5 { 
+	// NOTE(jim): this is an integer count cast to a f32, so if it's less than 
+	// 1.0 - eps it's zero and the code should panic.
+		panic!("overlap_coefficient: denominator is zero.");
+	}
+	
+    data
+        .axis_iter(Axis(0))
+        .filter(|data_row| usize::from(data_row.sum()) == data_row.len())
+        .count() as f32 / denom
     // NOTE(jim): .fold may be faster than .filter.count
        
 }
@@ -64,11 +71,11 @@ fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
 
 #[derive(Default)]
 pub struct Hypergraph {
-    incidence_matrix: Option<Array2<u8>>, 
-    edge_weights: Option<Vec<f32>>,
-    node_weights: Option<Vec<f32>>,
-    edge_list: Option<Vec<u8>>, // TODO(jim): decide on this type (HashSet<Vec<u8 / usize>>?)
-    node_list: Option<Vec<u8>>, // TODO(jim): decide on this type (HashSet<u8 / usize>?)
+    incidence_matrix: Array2<u8>, 
+    edge_weights: Vec<f32>,
+    node_weights: Vec<f32>,
+    edge_list: Vec<u8>, // TODO(jim): decide on this type (HashSet<Vec<u8 / usize>>?)
+    node_list: Vec<u8>, // TODO(jim): decide on this type (HashSet<u8 / usize>?)
 }
 
 
@@ -76,21 +83,6 @@ pub struct Hypergraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn instantiated() {
-        //     ** Copied from the python implementation ** 
-        //     Tests the instantiation of the hypergraph object.
-        //     Pretty simple test as all internal state is set to None.
-        
-        let h = Hypergraph{..Default::default()};
-        
-        assert!(h.incidence_matrix.is_none());
-        assert!(h.edge_weights.is_none());
-        assert!(h.node_weights.is_none());
-        assert!(h.edge_list.is_none());
-        assert!(h.node_list.is_none());
-    }
     
     #[test]
     fn reduced_powerset_t() {
@@ -220,6 +212,25 @@ mod tests {
             overlap_coefficient(data.slice(s![.., 1..=2])),
             2.0 / 3.0
         );
+        
+    }
+	
+	
+    #[test]
+	#[should_panic]
+    fn overlap_coefficient_divide_by_zero_t() {
+        // Not part of the python implementation
+        // Tests the computation of the overlap coefficient
+        
+        let data = array![
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 0, 1],
+            [1, 1, 0, 1]
+        ];
+        
+        overlap_coefficient(data.slice(s![.., 1..=2]));
         
     }
     
