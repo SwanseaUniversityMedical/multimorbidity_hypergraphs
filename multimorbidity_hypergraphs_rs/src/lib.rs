@@ -84,13 +84,12 @@ fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
 }
 
 
-#[derive(Default)]
 pub struct Hypergraph {
     incidence_matrix: Array2<u8>, 
     edge_weights: Vec<f32>,
     node_weights: Vec<f32>,
-    edge_list: Vec<u8>, // TODO(jim): decide on this type (HashSet<Vec<u8 / usize>>?)
-    node_list: Vec<u8>, // TODO(jim): decide on this type (HashSet<u8 / usize>?)
+    edge_list: Vec<Vec<u8>>, 
+    node_list: Vec<u8>, 
 }
 
 
