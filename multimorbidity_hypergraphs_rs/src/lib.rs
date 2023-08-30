@@ -4,18 +4,40 @@
 #[allow(unused_imports)]
 // done
 
-//use ndarray::prelude::*;
-use ndarray::{array, s, Array2, ArrayView1, ArrayView2, Axis};
+use ndarray::{
+    array, 
+    s, 
+    Array,
+    Array2, 
+    ArrayView1, 
+    ArrayView2, 
+    Axis
+};
 use itertools::Itertools;
 
 use std::collections::HashSet;
-//use std::convert::From;
-
+use std::iter::zip;
 
 /*fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }*/
 
+fn incidence_matrix(edge_list: Vec<Vec<usize>>) -> Array2<u8> {
+    
+    let max_column = edge_list
+        .iter()
+        .flat_map(|edge| edge.iter())
+        .copied()
+        .max()
+        .unwrap() + 1;
+
+    Array::from_shape_fn(
+        (edge_list.len(), max_column),
+        |(ii, jj)| {
+            edge_list[ii].contains(&jj).then(|| 1).unwrap_or(0)
+        }
+    )
+}
 
 fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
     
@@ -72,7 +94,7 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
         .collect::<HashSet<_>>()
 }
 
-fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
+fn construct_edge_list(data: Array2<u8>) -> Vec<Vec<usize>> {
     
     // More functional programming... 
     data
@@ -80,6 +102,8 @@ fn construct_edge_list(data: Array2<u8>) -> HashSet<Vec<usize>> {
         .map(|x| reduced_powerset(x))
         .flatten()
         .collect::<HashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>()
     
 }
 
@@ -88,8 +112,8 @@ pub struct Hypergraph {
     incidence_matrix: Array2<u8>, 
     edge_weights: Vec<f32>,
     node_weights: Vec<f32>,
-    edge_list: Vec<Vec<u8>>, 
-    node_list: Vec<u8>, 
+    edge_list: Vec<Vec<usize>>, 
+    node_list: Vec<usize>, 
 }
 
 
@@ -184,25 +208,25 @@ mod tests {
             [1, 1, 1, 1]
         ];
         
-        let mut expected = HashSet::new();
+        let mut expected = Vec::new();
         
-        expected.insert(vec![0,1,2,3]);
+        expected.push(vec![0,1,2,3]);
         
-        expected.insert(vec![0,1,2]);
-        expected.insert(vec![0,1,3]);
-        expected.insert(vec![0,2,3]);
-        expected.insert(vec![1,2,3]);
+        expected.push(vec![0,1,2]);
+        expected.push(vec![0,1,3]);
+        expected.push(vec![0,2,3]);
+        expected.push(vec![1,2,3]);
         
-        expected.insert(vec![0,1]);
-        expected.insert(vec![0,2]);
-        expected.insert(vec![0,3]);
-        expected.insert(vec![1,2]);
-        expected.insert(vec![1,3]);
-        expected.insert(vec![2,3]);
+        expected.push(vec![0,1]);
+        expected.push(vec![0,2]);
+        expected.push(vec![0,3]);
+        expected.push(vec![1,2]);
+        expected.push(vec![1,3]);
+        expected.push(vec![2,3]);
         
         assert_eq!(
-            construct_edge_list(data),
-            expected
+            construct_edge_list(data).sort(),
+            expected.sort()
         );
 
         
@@ -277,6 +301,49 @@ mod tests {
         let data = array![[]];
         
         overlap_coefficient(data.slice(s![.., ..]));
+        
+    }
+    
+    #[test]
+    fn incidence_matrix_t() {
+        
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];
+        
+        let edge_list = construct_edge_list(data);
+        
+        let expected = array![
+            [1,1,0,0],
+            [1,0,1,0],
+            [1,1,1,1],
+            [0,1,1,0],
+            [1,1,0,1],
+            [1,1,1,0],
+            [1,0,0,1],
+            [1,0,1,1],
+            [0,1,0,1],
+            [0,0,1,1],
+            [0,1,1,1]
+        ];
+        
+        let inc_mat = incidence_matrix(edge_list);
+        
+        assert_eq!(
+            inc_mat.axis_iter(Axis(0)).len(),
+            expected.axis_iter(Axis(0)).len()
+        );
+        
+        for x in inc_mat.axis_iter(Axis(0)) {
+            
+            assert!(expected.axis_iter(Axis(0)).contains(&x));
+            
+        }
+        
         
     }
 }
