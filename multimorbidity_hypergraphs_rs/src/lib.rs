@@ -16,7 +16,7 @@ use ndarray::{
 use itertools::Itertools;
 use rayon::prelude::*;
 
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
 
 pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
     
@@ -146,6 +146,7 @@ pub struct Hypergraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     
     #[test]
     fn reduced_powerset_t() {
