@@ -17,11 +17,26 @@ use itertools::Itertools;
 use rayon::prelude::*;
 
 use std::collections::{HashSet, HashMap};
-use std::iter::zip;
 
-/*fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}*/
+pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
+    
+    let edge_list = construct_edge_list(&data);
+    let inc_mat = incidence_matrix(&edge_list);
+    let node_list = (0..inc_mat.ncols()).collect::<Vec<_>>();
+    
+    let node_w = node_list
+        .iter()
+        .map(|x| overlap_coefficient(data.select(Axis(1), [*x].as_slice()).view()     ))
+        .collect::<Vec<_>>();
+    
+    Hypergraph {
+        incidence_matrix: inc_mat, 
+        edge_weights: compute_edge_weights(&data, &edge_list),
+        node_weights: node_w,
+        edge_list: edge_list, 
+        node_list: node_list, 
+    }
+}
 
 fn compute_edge_weights(data: &Array2<u8>, edge_list: &Vec<Vec<usize>>) -> Vec<f32> {
     
@@ -32,7 +47,7 @@ fn compute_edge_weights(data: &Array2<u8>, edge_list: &Vec<Vec<usize>>) -> Vec<f
     
 }
 
-fn incidence_matrix(edge_list: Vec<Vec<usize>>) -> Array2<u8> {
+fn incidence_matrix(edge_list: &Vec<Vec<usize>>) -> Array2<u8> {
     
     let max_column = edge_list
         .iter()
@@ -341,7 +356,7 @@ mod tests {
             [0,1,1,1]
         ];
         
-        let inc_mat = incidence_matrix(edge_list);
+        let inc_mat = incidence_matrix(&edge_list);
         
         assert_eq!(
             inc_mat.axis_iter(Axis(0)).len(),
@@ -425,5 +440,27 @@ mod tests {
             assert_eq!(weights[ii], expected[&edge]);
         }
      
+    }
+    
+    #[test]
+    fn compute_hypergraph_remaining_fns_t() {
+        
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];
+        
+        let h = compute_hypergraph(&data);
+        
+        let expected = vec![2./5., 4./5., 3./5., 3./5.];
+        
+        assert_eq!(h.node_list.len(), 4);
+        
+        for ii in h.node_list.iter() {
+            assert_eq!(h.node_weights[*ii], expected[*ii]);
+        }
     }
 }
