@@ -132,7 +132,7 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
 }
 
-
+#[derive(Debug)]
 pub struct Hypergraph {
     incidence_matrix: Array2<u8>, 
     edge_weights: Vec<f32>,
