@@ -15,12 +15,21 @@ use ndarray::{
 };
 use itertools::Itertools;
 
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::iter::zip;
 
 /*fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }*/
+
+fn compute_edge_weights(data: &Array2<u8>, edge_list: &Vec<Vec<usize>>) -> Vec<f32> {
+    
+    edge_list
+        .into_iter()
+        .map(|x| overlap_coefficient(data.select(Axis(1), x.as_slice()).view()))
+        .collect::<Vec<_>>()
+    
+}
 
 fn incidence_matrix(edge_list: Vec<Vec<usize>>) -> Array2<u8> {
     
@@ -60,8 +69,8 @@ fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
                 .unwrap() as f32;
                 
             if denom < 0.5 { 
-            // NOTE(jim): this is an integer count cast to a f32, so if it's less than 
-            // 1.0 - eps it's zero and the code should panic.
+            // NOTE(jim): this is an integer count cast to a f32, so if its less than 
+            // 1.0 - eps its zero and the code should panic.
                 panic!("overlap_coefficient: denominator is zero.");
             }
             
@@ -79,7 +88,7 @@ fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
 fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
     // more functional approach. Test for speed later?
-    // don't foget automatic returns
+    // dont foget automatic returns
     (2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
         .map(|ii| 
             data_row
@@ -94,7 +103,7 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
         .collect::<HashSet<_>>()
 }
 
-fn construct_edge_list(data: Array2<u8>) -> Vec<Vec<usize>> {
+fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
     // More functional programming... 
     data
@@ -225,7 +234,7 @@ mod tests {
         expected.push(vec![2,3]);
         
         assert_eq!(
-            construct_edge_list(data).sort(),
+            construct_edge_list(&data).sort(),
             expected.sort()
         );
 
@@ -315,7 +324,7 @@ mod tests {
             [1, 1, 1, 1]
         ];
         
-        let edge_list = construct_edge_list(data);
+        let edge_list = construct_edge_list(&data);
         
         let expected = array![
             [1,1,0,0],
@@ -344,6 +353,45 @@ mod tests {
             
         }
         
+        
+    }
+    
+    #[test]
+    fn compute_edge_weights_t() {
+        
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];
+        
+        let expected = HashMap::from([     
+            (vec![0, 1], 1./2.),
+            (vec![0, 2], 2./2.),
+            (vec![1, 2], 2./3.),
+            (vec![0, 3], 1./2.),
+            (vec![1, 3], 3./3.),
+            (vec![2, 3], 2./3.),
+            (vec![0, 1, 2], 1./2.),
+            (vec![0, 1, 3], 1./2.),
+            (vec![0, 2, 3], 1./2.),
+            (vec![1, 2, 3], 2./3.),
+            (vec![0, 1, 2, 3], 1./2.), // TODO(jim): decide if we need the "all diseases" edge.
+        ]);
+        
+        let edge_list = construct_edge_list(&data);
+        let weights = compute_edge_weights(&data, &edge_list);
+        
+        assert_eq!(
+            weights.len(),
+            expected.len()
+        );
+        
+        for (ii, edge) in edge_list.into_iter().enumerate() {
+            assert_eq!(weights[ii], expected[&edge]);
+        }
         
     }
 }
