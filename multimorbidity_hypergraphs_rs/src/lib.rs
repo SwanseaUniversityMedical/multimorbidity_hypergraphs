@@ -394,4 +394,35 @@ mod tests {
         }
         
     }
+    
+    #[test]
+    fn compute_edge_weights_zero_sets_t() {
+
+
+        let data = array![
+            [1, 0, 1],
+            [0, 1, 0],
+            [0, 1, 1],
+            [0, 1, 1]
+        ]; // there is no one with disease 0 and disease 1
+
+        let expected = HashMap::from([     
+            //(vec![0, 1], 0.0),
+            (vec![0, 2], 1./1.),
+            (vec![1, 2], 2./3.),
+        ]);
+     
+        let edge_list = construct_edge_list(&data);
+        let weights = compute_edge_weights(&data, &edge_list);
+        
+        assert_eq!(
+            weights.len(),
+            expected.len()
+        );
+        
+        for (ii, edge) in edge_list.into_iter().enumerate() {
+            assert_eq!(weights[ii], expected[&edge]);
+        }
+     
+    }
 }
