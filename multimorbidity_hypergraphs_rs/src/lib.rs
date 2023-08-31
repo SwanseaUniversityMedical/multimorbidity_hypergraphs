@@ -14,6 +14,7 @@ use ndarray::{
     Axis
 };
 use itertools::Itertools;
+use rayon::prelude::*;
 
 use std::collections::{HashSet, HashMap};
 use std::iter::zip;
@@ -25,7 +26,7 @@ use std::iter::zip;
 fn compute_edge_weights(data: &Array2<u8>, edge_list: &Vec<Vec<usize>>) -> Vec<f32> {
     
     edge_list
-        .into_iter()
+        .into_par_iter()
         .map(|x| overlap_coefficient(data.select(Axis(1), x.as_slice()).view()))
         .collect::<Vec<_>>()
     
