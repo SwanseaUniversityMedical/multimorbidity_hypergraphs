@@ -20,13 +20,15 @@ use std::collections::HashSet;
 
 pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
     
+    // Computes the hypergraph from an array of data.
+    
     let edge_list = construct_edge_list(&data);
     let inc_mat = incidence_matrix(&edge_list);
     let node_list = (0..inc_mat.ncols()).collect::<Vec<_>>();
     
     let node_w = node_list
         .iter()
-        .map(|x| overlap_coefficient(data.select(Axis(1), [*x].as_slice()).view()     ))
+        .map(|x| overlap_coefficient(data.select(Axis(1), [*x].as_slice()).view()))
         .collect::<Vec<_>>();
     
     Hypergraph {
@@ -40,6 +42,9 @@ pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
 
 fn compute_edge_weights(data: &Array2<u8>, edge_list: &Vec<Vec<usize>>) -> Vec<f32> {
     
+    // Loops over the edges to calculate the edge weights. Currently only the overlap
+    // coefficient is supported.
+    
     edge_list
         .into_par_iter()
         .map(|x| overlap_coefficient(data.select(Axis(1), x.as_slice()).view()))
@@ -48,6 +53,8 @@ fn compute_edge_weights(data: &Array2<u8>, edge_list: &Vec<Vec<usize>>) -> Vec<f
 }
 
 fn incidence_matrix(edge_list: &Vec<Vec<usize>>) -> Array2<u8> {
+    
+    // Generates the incidence matrix from the edge list
     
     let max_column = edge_list
         .iter()
@@ -66,6 +73,8 @@ fn incidence_matrix(edge_list: &Vec<Vec<usize>>) -> Array2<u8> {
 
 fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
     
+    // Calculates the overlap coefficient for an edge, or the prevalence for 
+    // data on only one disease. 
     
     match data.ncols() {
         
@@ -103,8 +112,9 @@ fn overlap_coefficient(data: ArrayView2<u8>) -> f32 {
 
 fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
-    // more functional approach. Test for speed later?
-    // dont foget automatic returns
+    // Returns the "reduced" powerset of a single set of diseases (ie the powerset
+    // without the empty or singleton sets. 
+    
     (2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
         .map(|ii| 
             data_row
@@ -121,7 +131,8 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
 
 fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
-    // More functional programming... 
+    // Constructs the full edge list from the original data array.
+    
     data
         .axis_iter(Axis(0))
         .map(|x| reduced_powerset(x))
@@ -150,7 +161,6 @@ mod tests {
     
     #[test]
     fn reduced_powerset_t() {
-        // Not part of the python implementation
         // Tests the function to construct the reduced powerset
         
         let data: Array2<u8> = array![
@@ -176,8 +186,8 @@ mod tests {
     
     #[test]
     fn reduced_powerset_singleton_t() {
-        // Not part of the python implementation
-        // Tests the function to construct the reduced powerset
+        // Tests the function to construct the reduced powerset for a person with exactly 
+        // 2 diseases. 
         
         let data: Array2<u8> = array![
             [1, 0, 1, 0],
@@ -199,8 +209,8 @@ mod tests {
     
     #[test]
     fn reduced_powerset_emptyset_t() {
-        // Not part of the python implementation
-        // Tests the function to construct the reduced powerset
+        // Tests the function to construct the reduced powerset for a person that has exactly 
+        // one disease.
         
         let data: Array2<u8> = array![
             [1, 0, 1, 0],
@@ -223,7 +233,6 @@ mod tests {
     
     #[test]
     fn construct_edge_list_t() {
-        // Not part of the python implementation
         // Tests the function to construct the edge list
         
         let data = array![
@@ -261,7 +270,6 @@ mod tests {
     
     #[test]
     fn overlap_coefficient_t() {
-        // Not part of the python implementation
         // Tests the computation of the overlap coefficient
         
         let data = array![
@@ -283,8 +291,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn overlap_coefficient_divide_by_zero_t() {
-        // Not part of the python implementation
-        // Tests the computation of the overlap coefficient
+        // Tests the computation of the overlap coefficient - should panic as /0.
         
         let data = array![
             [1, 0, 0, 0],
@@ -300,8 +307,7 @@ mod tests {
     
     #[test]
     fn overlap_coefficient_one_column_prevalence_t() {
-        // Not part of the python implementation
-        // Tests the computation of the overlap coefficient
+        // Tests the computation of the prevalence by the overlap coefficient function 
         
         let data = array![
             [1, 0, 1, 0],
@@ -321,8 +327,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn overlap_coefficient_one_column_divide_by_zero_t() {
-        // Not part of the python implementation
-        // Tests the computation of the overlap coefficient
+        // Tests whether the overlap coefficient function errors when given an empty array
         
         let data = array![[]];
         
@@ -332,6 +337,7 @@ mod tests {
     
     #[test]
     fn incidence_matrix_t() {
+        // tests the construction of the incidence matrix 
         
         let data = array![
             [1, 0, 1, 0],
@@ -376,6 +382,8 @@ mod tests {
     #[test]
     fn compute_edge_weights_t() {
         
+        // tests the computation of edge weights for all edges
+        
         let data = array![
             [1, 0, 1, 0],
             [0, 1, 0, 0],
@@ -415,6 +423,7 @@ mod tests {
     #[test]
     fn compute_edge_weights_zero_sets_t() {
 
+        // tests to make sure edges with zero weight are appropriately discarded.
 
         let data = array![
             [1, 0, 1],
@@ -445,6 +454,9 @@ mod tests {
     
     #[test]
     fn compute_hypergraph_remaining_fns_t() {
+        
+        // Test the remaining functionality of compute_hypergraph 
+        // (node_list, node_weights)
         
         let data = array![
             [1, 0, 1, 0],
