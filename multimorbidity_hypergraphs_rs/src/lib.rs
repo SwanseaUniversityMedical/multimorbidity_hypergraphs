@@ -152,6 +152,11 @@ pub struct Hypergraph {
     node_list: Vec<usize>, 
 }
 
+impl Hypergraph {
+    pub fn eigenvector_centrality(&self) -> Vec<f32> {
+        vec![0.0]
+    }
+}
 
 // Idiomatic rust is apparently to have tests and code in the same file
 #[cfg(test)]
@@ -475,5 +480,51 @@ mod tests {
         for ii in h.node_list.iter() {
             assert_eq!(h.node_weights[*ii], expected[*ii]);
         }
+    }
+    
+    // hypergraph methods
+    
+    #[test]
+    fn eigenvector_centrality_t () {
+        
+        // test the computation of the eigenvector centrality
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];
+        
+        // Note(jim): the following python code was used to calculate the exoected value:
+        /* `python 
+        
+        import numpy as np 
+        inc_mat = np.array([[1, 1, 1, 1],
+            [0, 0, 1, 1],
+            [1, 0, 1, 1],
+            [1, 1, 1, 0],
+            [0, 1, 0, 1],
+            [1, 0, 0, 1],
+            [0, 1, 1, 0],
+            [1, 1, 0, 0],
+            [0, 1, 1, 1],
+            [1, 1, 0, 1],
+            [1, 0, 1, 0]]
+        )
+        w_e = np.array([0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0])
+        a = inc_mat.T.dot(np.diag(w_e)).dot(inc_mat)
+        np.fill_diagonal(a, 0.0)
+        e_vals, e_vecs = np.linalg.eig(a)
+        np.abs(e_vecs[:, 0])
+        
+        */
+        let expected = vec![0.47680687, 0.50495932, 0.51253036, 0.50495932];
+        
+        let h = compute_hypergraph(&data);
+        let centrality = h.eigenvector_centrality();
+        
+        
+        assert_eq!(expected, centrality);
     }
 }
