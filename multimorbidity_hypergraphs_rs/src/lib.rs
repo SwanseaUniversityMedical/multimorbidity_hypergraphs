@@ -488,6 +488,8 @@ mod tests {
     fn eigenvector_centrality_t () {
         
         // test the computation of the eigenvector centrality
+        // NOTE(jim): Only calculating the weighted resultant: sqrt(w_n) * M^T * w_e * M * sqrt(w_n)
+        
         let data = array![
             [1, 0, 1, 0],
             [0, 1, 0, 0],
@@ -513,13 +515,17 @@ mod tests {
             [1, 0, 1, 0]]
         )
         w_e = np.array([0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0])
-        a = inc_mat.T.dot(np.diag(w_e)).dot(inc_mat)
+        w_n = np.array([0.4, 0.8, 0.6, 0.6])
+        
+        a = np.sqrt(np.diag(w_n)).dot(inc_mat.T).dot(np.diag(w_e)).dot(inc_mat).dot(np.diag(w_n))
         np.fill_diagonal(a, 0.0)
         e_vals, e_vecs = np.linalg.eig(a)
-        np.abs(e_vecs[:, 0])
+        np.abs(e_vecs[:, np.where((e_vals == e_vals.max()))[0][0]])
         
+        
+        output: array([0.43576871, 0.52442996, 0.51250412, 0.52193714])
         */
-        let expected = vec![0.47680687, 0.50495932, 0.51253036, 0.50495932];
+        let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
         
         let h = compute_hypergraph(&data);
         let centrality = h.eigenvector_centrality();
