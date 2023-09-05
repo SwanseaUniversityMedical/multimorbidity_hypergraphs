@@ -11,7 +11,8 @@ use ndarray::{
     Array2, 
     ArrayView1, 
     ArrayView2, 
-    Axis
+    Axis,
+    arr1
 };
 use rand::Rng;
 use itertools::Itertools;
@@ -159,9 +160,9 @@ fn standard_deviation(data: Vec<f32>, m: f32) -> f32 {
 
 
 fn iterate_vector(
-    incidence_matrix: &ArrayView2<u8>,
+    incidence_matrix: &ArrayView2<f32>,
     weight: &Vec<f32>,
-    eigenvector: &[f32],
+    eigenvector: &Vec<f32>,
 ) -> Vec<f32> {
 
     //let result: Vec<f32>;
@@ -254,7 +255,7 @@ impl Hypergraph {
         for iteration in 0..max_iterations {
 
             eigenvector_new = iterate_vector(
-                &self.incidence_matrix.view(),
+                &self.incidence_matrix.mapv(|x| f32::from(x)).view(),
                 &self.edge_weights,
                 &eigenvector_old,
             );
@@ -631,6 +632,57 @@ mod tests {
     }
     
     // hypergraph methods
+    
+    #[test]
+    fn iterate_vector_t() {
+        
+        let inc_mat = array![[1.0, 1.0, 1.0, 1.0],
+            [0.0, 0.0, 1.0, 1.0],
+            [1.0, 0.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0, 0.0],
+            [0.0, 1.0, 1.0, 1.0],
+            [1.0, 1.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0, 0.0]];
+        
+        let w_e = vec![0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0];
+        let w_n = vec![0.4, 0.8, 0.6, 0.6];
+        
+        
+        let vector = vec![0.5; 4];
+        
+        
+        
+        let sqrt_w_n: Vec<f32> = w_n
+            .iter()
+            .map(|x: &f32| (*x).sqrt())
+            .collect();
+            
+         
+        let big_mess = Array::from_diag(&arr1(&sqrt_w_n))
+                .dot(&inc_mat.t())
+                .dot(&Array::from_diag(&arr1(&w_e)))
+                .dot(&inc_mat)
+                .dot(&Array::from_diag(&arr1(&sqrt_w_n)));
+      
+        let adj = &big_mess -  Array::from_diag(&big_mess.diag());
+        let expected: Vec<f32> = adj.dot(&Array::from_vec(vector.clone()))
+            .into_iter()
+            .map(|x| x)
+            .collect();
+        
+        
+        let res = iterate_vector(&inc_mat.view(), &w_e, &vector);
+        
+        assert_eq!(
+            res, 
+            expected
+        );
+        
+    }
     
     #[test]
     fn eigenvector_centrality_t () {
