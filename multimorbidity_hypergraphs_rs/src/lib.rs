@@ -649,24 +649,11 @@ mod tests {
             [1.0, 0.0, 1.0, 0.0]];
         
         let w_e = vec![0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0];
-        let w_n = vec![0.4, 0.8, 0.6, 0.6];
-        
-        
         let vector = vec![0.5; 4];
         
-        
-        
-        let sqrt_w_n: Vec<f32> = w_n
-            .iter()
-            .map(|x: &f32| (*x).sqrt())
-            .collect();
-            
-         
-        let big_mess = Array::from_diag(&arr1(&sqrt_w_n))
-                .dot(&inc_mat.t())
+        let big_mess = inc_mat.t()
                 .dot(&Array::from_diag(&arr1(&w_e)))
-                .dot(&inc_mat)
-                .dot(&Array::from_diag(&arr1(&sqrt_w_n)));
+                .dot(&inc_mat);
       
         let adj = &big_mess -  Array::from_diag(&big_mess.diag());
         let expected: Vec<f32> = adj.dot(&Array::from_vec(vector.clone()))
@@ -674,6 +661,8 @@ mod tests {
             .map(|x| x)
             .collect();
         
+        
+        // now, function that's being tested. 
         
         let res = iterate_vector(&inc_mat.view(), &w_e, &vector);
         
