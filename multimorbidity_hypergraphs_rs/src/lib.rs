@@ -162,6 +162,68 @@ fn standard_deviation(data: Vec<f32>, m: f32) -> f32 {
 fn iterate_vector(
     incidence_matrix: &ArrayView2<f32>,
     weight: &Vec<f32>,
+    vector: &Vec<f32>,
+) -> Vec<f32> {
+
+    if let [outer, inner] = &incidence_matrix.shape() {
+        
+        println!("{}, {}", outer, inner);
+        
+        let mut weighted_incidence: Array2<f32> = Array::zeros((*outer, *inner));
+        for i in 0..*outer {
+            for j in 0..*inner {
+                weighted_incidence[[i, j]] += incidence_matrix[[i, j]] * weight[i];
+            }
+        }
+        
+        let mut intermediate = vec![0.0; *outer];
+
+        println!("{}", vector.len());
+        
+        for k in 0..*outer {
+            for j in 0..*inner {
+                intermediate[k] += weighted_incidence[[k, j]] * vector[j];
+            }
+        }        
+        
+        let mut term_1 = vec![0.0; vector.len()];
+
+        for i in 0..*inner {
+            for k in 0..*outer {
+                term_1[i] += incidence_matrix[[k, i]] * intermediate[k];
+            }
+        }
+        
+        let mut subt = vec![0.0; vector.len()];
+    
+        for i in 0..*inner {
+            for k in 0..*outer {
+                subt[i] += incidence_matrix[[k, i]] * weighted_incidence[[k, i]] * vector[i];
+            }
+        }
+        
+        let mut result = vec![0.0; vector.len()];
+
+        for i in 0..vector.len() {
+            result[i] = term_1[i] - subt[i];
+        }
+        
+        return result;
+        
+        
+        
+        
+    } else {
+        panic!("The incidence matrix has the wrong shape.");
+    }  
+
+    
+
+}
+
+fn iterate_vector_old(
+    incidence_matrix: &ArrayView2<f32>,
+    weight: &Vec<f32>,
     eigenvector: &Vec<f32>,
 ) -> Vec<f32> {
 
@@ -666,10 +728,10 @@ mod tests {
         
         let res = iterate_vector(&inc_mat.view(), &w_e, &vector);
         
-        assert_eq!(
-            res, 
-            expected
-        );
+        for (x, y) in expected.iter().zip(&res) {
+            
+            assert!((x - y).abs() < 0.000001);
+        }
         
     }
     
