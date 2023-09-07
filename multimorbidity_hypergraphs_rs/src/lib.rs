@@ -159,7 +159,7 @@ fn standard_deviation(data: Vec<f32>, m: f32) -> f32 {
 }
 
 
-fn iterate_vector(
+fn iterate_vector_loop(
     incidence_matrix: &ArrayView2<f32>,
     weight: &Vec<f32>,
     vector: &Vec<f32>,
@@ -221,63 +221,57 @@ fn iterate_vector(
 
 }
 
-fn iterate_vector_old(
+fn iterate_vector(
     incidence_matrix: &ArrayView2<f32>,
     weight: &Vec<f32>,
-    eigenvector: &Vec<f32>,
+    vector: &Vec<f32>,
 ) -> Vec<f32> {
 
-    //let result: Vec<f32>;
     if let [outer, inner] = &incidence_matrix.shape() {
         
-        // Happy with this
         let weighted_incidence: Array2<f32> = Array::from_shape_vec((*outer, *inner), 
             (0..outer*inner)
                 .into_par_iter()
-                .map(|i| (incidence_matrix[[i / inner, i % inner]] as f32) * weight[i % inner])
+                .map(|i| (incidence_matrix[[i / inner, i % inner]] as f32) * weight[i / inner])
                 .collect()
         ).unwrap();
 
         
-        // Happy with this
-        let intermediate: Vec<f32> = (0..*inner)
+        let intermediate: Vec<f32> = (0..*outer)
             .into_par_iter()
             .map(|k| {
-                (0..eigenvector.len())
-                    .map(|j| weighted_incidence[[j, k]] * eigenvector[j])
-                    .sum::<f32>()
+                (0..*inner)
+                    .map(|j| weighted_incidence[[k, j]] * vector[j])
+                    .sum()
             })
             .collect();
         
-        //happy with this 
-        let term_1: Vec<f32> = (0..eigenvector.len())
+        let term_1: Vec<f32> = (0..*inner)
             .into_par_iter()
             .map(|i| {
-                (0..*inner)
-                    .map(|k| weighted_incidence[[i, k]] * intermediate[k])
+                (0..*outer)
+                    .map(|k| incidence_matrix[[k, i]] * intermediate[k])
                     .sum()
             })
             .collect();
             
-        // happy with this 
-        let subt: Vec<f32> = (0..eigenvector.len())
+        let subt: Vec<f32> = (0..*inner)
             .map(|i| {
-                (0..*inner)
+                (0..*outer)
                     .into_par_iter()
-                    .map(|k| (incidence_matrix[[i, k]] as f32) * weighted_incidence[[i, k]] * eigenvector[i])
+                    .map(|k| (incidence_matrix[[k, i]] as f32) * weighted_incidence[[k, i]] * vector[i])
                     .sum()
             })
             .collect();
             
-        (0..eigenvector.len())
+        (0..vector.len())
             .into_par_iter()
             .map(|i| term_1[i] - subt[i])
             .collect()
 
     } else {
         panic!("The incidence matrix has the wrong shape.");
-    }       
-    //result
+    }
 
 }
 
@@ -727,6 +721,9 @@ mod tests {
         // now, function that's being tested. 
         
         let res = iterate_vector(&inc_mat.view(), &w_e, &vector);
+        
+        println!("{:?}", expected);
+        println!("{:?}", res);
         
         for (x, y) in expected.iter().zip(&res) {
             
