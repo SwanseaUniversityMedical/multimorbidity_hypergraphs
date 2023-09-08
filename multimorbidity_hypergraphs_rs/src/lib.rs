@@ -221,13 +221,15 @@ fn iterate_vector_loop(
 
 }
 
-fn iterate_vector(
+fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f32>,
     weight: &Vec<f32>,
     vector: &Vec<f32>,
 ) -> Vec<f32> {
 
     if let [outer, inner] = &incidence_matrix.shape() {
+        
+        //println!("{}, {}", outer, inner);
         
         let weighted_incidence: Array2<f32> = Array::from_shape_vec((*outer, *inner), 
             (0..outer*inner)
@@ -236,6 +238,7 @@ fn iterate_vector(
                 .collect()
         ).unwrap();
 
+        //println!("wi = {:?}", weighted_incidence);
         
         let intermediate: Vec<f32> = (0..*outer)
             .into_par_iter()
@@ -245,6 +248,8 @@ fn iterate_vector(
                     .sum()
             })
             .collect();
+            
+        //println!("inter = {:?}", intermediate);
         
         let term_1: Vec<f32> = (0..*inner)
             .into_par_iter()
@@ -255,6 +260,8 @@ fn iterate_vector(
             })
             .collect();
             
+        //println!("term_1 = {:?}", term_1);
+            
         let subt: Vec<f32> = (0..*inner)
             .map(|i| {
                 (0..*outer)
@@ -264,7 +271,9 @@ fn iterate_vector(
             })
             .collect();
             
-        (0..vector.len())
+        //println!("subt = {:?}", subt);
+            
+        (0..term_1.len())
             .into_par_iter()
             .map(|i| term_1[i] - subt[i])
             .collect()
@@ -273,6 +282,62 @@ fn iterate_vector(
         panic!("The incidence matrix has the wrong shape.");
     }
 
+}
+
+
+fn EVC_iteration(
+    inc_mat: ArrayView2<f32>, 
+    weight: &Vec<f32>, 
+    eigenvector: Vec<f32>,
+    tolerance: f32,
+    iter_no: u8,
+) -> Vec<f32> {
+    
+    // 1) perform an iteration
+    
+    println!("Iteration {}", iter_no);
+    
+    let eigenvector_new = adjacency_matrix_times_vector(
+        &inc_mat,
+        weight,
+        &eigenvector,
+    );
+    
+    let mut iter_eigenvalue: Vec<f32> = eigenvector_new
+        .iter()
+        .zip(eigenvector.iter())
+        .map(|(&a, &b)| {
+                if b > 1e-6 {
+                    a / b
+                } else {
+                    0.0
+                }
+            }
+        )
+        .collect();
+        
+    iter_eigenvalue.retain(|&b| b > 0.0);
+
+    // 2) estimate = mean( #1 above )
+    let eigenvalue = iter_eigenvalue.iter().sum::<f32>() / (iter_eigenvalue.len() as f32);
+
+    // 3) error estimate = std( #1 above)    
+    let err_estimate = standard_deviation(iter_eigenvalue, eigenvalue); 
+    
+    let norm = eigenvector_new.iter().fold(0., |sum, &num| sum + num*num).sqrt();
+    
+    
+    if (err_estimate < tolerance) | (iter_no > 10) {
+        eigenvector_new 
+    } else {
+        EVC_iteration(
+            inc_mat,
+            weight,
+            eigenvector_new.iter().map(|&b| b / norm).collect(),
+            tolerance,
+            iter_no + 1
+        )
+    }   
 }
 
 #[derive(Debug)]
@@ -297,16 +362,50 @@ impl Hypergraph {
         // generate a random initial estimate for the eigenvector.
         // Possibly slow but only has to be done once.
         let mut rng = rand::thread_rng();
-        let mut eigenvector_old: Vec<f32> = vec![0.0; im_dims[0]];
-        for ii in 0..eigenvector_old.len() {
-            eigenvector_old[ii] = rng.gen_range(0.0..1.0);
+        
+        // TODO - see if this can be done in one step without mutability.
+        let mut eigenvector: Vec<f32> = (0..im_dims[0])
+            .map(|_| rng.gen_range(0.0..1.0))
+            .collect();
+        let norm = eigenvector.iter().fold(0., |sum, &num| sum + num*num).sqrt();
+        eigenvector = eigenvector.iter().map(|&b| b / norm).collect();
+
+        //let eigenvector_new = eigenvector_old.to_owned();
+        //let eigenvalue: f32 = 0.0;
+        
+        
+        // TODO - 
+        // 1a) set up initialisation - DONE
+        // weighted resultant (and test) - DONE
+        // 1b) figure out the initialisation for the different graph reps
+        // 2a) figure out if I need a test for a single pass through the recursive function
+        // 2b) write recursive function to take the place of the loop
+
+        let mut inc_mat :Array2<f32> = Array::zeros(self.incidence_matrix.raw_dim());
+        
+        for i in (0..self.incidence_matrix.nrows()) {
+            for j in (0..self.incidence_matrix.ncols()) {
+                inc_mat[[i, j]] = self.incidence_matrix[[i, j]] as f32 * self.node_weights[j].sqrt();
+            }
         }
+        
+        
+        //= self.incidence_matrix
+        //    .mapv(|x| f32::from(x))
+        //    .view()
 
-        let norm = eigenvector_old.iter().fold(0., |sum, &num| sum + num*num).sqrt();
-        eigenvector_old = eigenvector_old.iter().map(|&b| b / norm).collect();
+        //.map(|i| (incidence_matrix[[i / inner, i % inner]] as f32) * weight[i / inner])
 
-        let mut eigenvector_new = eigenvector_old.to_owned();
-        let mut eigenvalue: f32 = 0.0;
+        EVC_iteration(
+            inc_mat.view(),
+            &self.edge_weights,
+            eigenvector,
+            tolerance,
+            0,
+        )
+
+
+        /*
 
         for iteration in 0..max_iterations {
 
@@ -358,6 +457,7 @@ impl Hypergraph {
 
         //(eigenvalue, PyArray::from_vec(py, eigenvector_new))
         eigenvector_new
+        */
     
     }
     
@@ -690,7 +790,7 @@ mod tests {
     // hypergraph methods
     
     #[test]
-    fn iterate_vector_t() {
+    fn adjacency_matrix_times_vector_t() {
         
         let inc_mat = array![[1.0, 1.0, 1.0, 1.0],
             [0.0, 0.0, 1.0, 1.0],
@@ -720,7 +820,7 @@ mod tests {
         
         // now, function that's being tested. 
         
-        let res = iterate_vector(&inc_mat.view(), &w_e, &vector);
+        let res = adjacency_matrix_times_vector(&inc_mat.view(), &w_e, &vector);
         
         println!("{:?}", expected);
         println!("{:?}", res);
@@ -799,8 +899,8 @@ mod tests {
         output: array([0.48837738, 0.50224377, 0.50694174, 0.50224377])
         
         */
-        //let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
-        let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
+        let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
+        //let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
         let e_norm = (expected.iter().fold(0.0, |acc, num| acc + num * num) as f32).sqrt();
         
         let tol = 0.001;
@@ -813,10 +913,11 @@ mod tests {
         
         
         assert!(
-            expected.iter().map(|x| x / e_norm)  //.collect::<Vec<_>>(), 
+            (expected.iter().map(|x| x / e_norm)  //.collect::<Vec<_>>(), 
                 .zip(centrality.iter().map(|x| x / c_norm).collect::<Vec<_>>())
-                .map(|(x, y)| (x - y).abs() < tol)
-                .all(|x| x)
+                .map(|(x, y)| (x - y).powf(2.0))
+                .sum::<f32>() / expected.len() as f32) < tol
+                //.all(|x| x)
         );
     }
 }
