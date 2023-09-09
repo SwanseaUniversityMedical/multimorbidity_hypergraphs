@@ -14,11 +14,13 @@ use ndarray::{
     Axis,
     arr1
 };
+
 use rand::Rng;
 use itertools::Itertools;
 use rayon::prelude::*;
 
 use std::collections::HashSet;
+
 
 pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
     
@@ -273,10 +275,21 @@ fn adjacency_matrix_times_vector(
             
         //println!("subt = {:?}", subt);
             
-        (0..term_1.len())
+        /*let vector: Vec<f32> = */(0..term_1.len())
             .into_par_iter()
             .map(|i| term_1[i] - subt[i])
-            .collect()
+            .collect()/*;
+    
+        let norm = vector
+            .iter()
+            .map(|&x| x.powf(2.0))
+            .sum::<f32>()
+            .sqrt();
+    
+        vector
+            .iter()
+            .map(|&x| x / norm)
+            .collect()*/
 
     } else {
         panic!("The incidence matrix has the wrong shape.");
@@ -290,19 +303,32 @@ fn EVC_iteration(
     weight: &Vec<f32>, 
     eigenvector: Vec<f32>,
     tolerance: f32,
-    iter_no: u8,
+    iter_no: u32,
+    max_iterations: u32,
 ) -> Vec<f32> {
     
     // 1) perform an iteration
     
-    println!("Iteration {}", iter_no);
-    
-    let eigenvector_new = adjacency_matrix_times_vector(
+    let mut eigenvector_new = adjacency_matrix_times_vector(
         &inc_mat,
         weight,
         &eigenvector,
     );
     
+    let evnew_norm = eigenvector_new
+        .iter()
+        .map(|x| x.powf(2.0))
+        .sum::<f32>()
+        .sqrt();
+    
+    eigenvector_new = eigenvector_new
+        .iter() 
+        .map(|x| x / evnew_norm)
+        .collect::<Vec<_>>();
+    
+    
+    
+    /*
     let mut iter_eigenvalue: Vec<f32> = eigenvector_new
         .iter()
         .zip(eigenvector.iter())
@@ -323,19 +349,31 @@ fn EVC_iteration(
 
     // 3) error estimate = std( #1 above)    
     let err_estimate = standard_deviation(iter_eigenvalue, eigenvalue); 
+    */
     
-    let norm = eigenvector_new.iter().fold(0., |sum, &num| sum + num*num).sqrt();
+    let err_estimate = eigenvector_new
+        .iter()
+        .zip(&eigenvector)
+        .map(|(&x, &y)| (x - y).powf(2.0))
+        .sum::<f32>()
+        .sqrt();
+    
+    println!("{}", err_estimate);
+    
+    //let norm = eigenvector_new.iter().fold(0., |sum, &num| sum + num*num).sqrt();
     
     
-    if (err_estimate < tolerance) | (iter_no > 10) {
+    if (err_estimate < tolerance) | (iter_no > max_iterations) {
+        println!("Converged in {} iterations", iter_no);
         eigenvector_new 
     } else {
         EVC_iteration(
             inc_mat,
             weight,
-            eigenvector_new.iter().map(|&b| b / norm).collect(),
+            eigenvector_new,//.iter().map(|&b| b / norm).collect(),
             tolerance,
-            iter_no + 1
+            iter_no + 1,
+            max_iterations
         )
     }   
 }
@@ -381,6 +419,7 @@ impl Hypergraph {
         // 2a) figure out if I need a test for a single pass through the recursive function
         // 2b) write recursive function to take the place of the loop
 
+        /*
         let mut inc_mat :Array2<f32> = Array::zeros(self.incidence_matrix.raw_dim());
         
         for i in (0..self.incidence_matrix.nrows()) {
@@ -388,13 +427,11 @@ impl Hypergraph {
                 inc_mat[[i, j]] = self.incidence_matrix[[i, j]] as f32 * self.node_weights[j].sqrt();
             }
         }
+        */
         
-        
-        //= self.incidence_matrix
-        //    .mapv(|x| f32::from(x))
-        //    .view()
+        let inc_mat = self.incidence_matrix
+            .mapv(|x| f32::from(x));
 
-        //.map(|i| (incidence_matrix[[i / inner, i % inner]] as f32) * weight[i / inner])
 
         EVC_iteration(
             inc_mat.view(),
@@ -402,6 +439,7 @@ impl Hypergraph {
             eigenvector,
             tolerance,
             0,
+            max_iterations,
         )
 
 
@@ -826,9 +864,11 @@ mod tests {
         println!("{:?}", res);
         
         for (x, y) in expected.iter().zip(&res) {
-            
-            assert!((x - y).abs() < 0.000001);
+            println!("{:?}", (x - y).abs());
+            assert!((x - y).abs() < 1e-6);
         }
+        
+        //assert!(false);
         
     }
     
@@ -837,14 +877,6 @@ mod tests {
         
         // test the computation of the eigenvector centrality
         // NOTE(jim): Only calculating the weighted resultant: sqrt(w_n) * M^T * w_e * M * sqrt(w_n)
-        
-        let data = array![
-            [1, 0, 1, 0],
-            [0, 1, 0, 0],
-            [0, 1, 0, 1],
-            [0, 1, 1, 1],
-            [1, 1, 1, 1]
-        ];
         
         // Note(jim): the following python code was used to calculate the exoected value:
         /* `python 
@@ -876,19 +908,19 @@ mod tests {
         NOT weighted resultant
         
         import numpy as np 
-        inc_mat = np.array([[1, 1, 1, 1],
-            [0, 0, 1, 1],
-            [1, 0, 1, 1],
-            [1, 1, 1, 0],
-            [0, 1, 0, 1],
-            [1, 0, 0, 1],
-            [0, 1, 1, 0],
-            [1, 1, 0, 0],
-            [0, 1, 1, 1],
-            [1, 1, 0, 1],
-            [1, 0, 1, 0]]
+        inc_mat = np.array([[0, 1, 0, 1],
+                 [1, 1, 0, 0],
+                 [1, 0, 1, 1],
+                 [0, 0, 1, 1],
+                 [1, 1, 0, 1],
+                 [0, 1, 1, 0],
+                 [1, 0, 0, 1],
+                 [1, 1, 1, 1],
+                 [0, 1, 1, 1],
+                 [1, 1, 1, 0],
+                 [1, 0, 1, 0]]
         )
-        w_e = np.array([0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0])
+        w_e = np.array([1.0, 0.5, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 0.5, 0.6666667, 0.5, 1.0])
         w_n = np.array([0.4, 0.8, 0.6, 0.6])
         
         a = np.sqrt(inc_mat.T.dot(np.diag(w_e)).dot(inc_mat))
@@ -899,25 +931,70 @@ mod tests {
         output: array([0.48837738, 0.50224377, 0.50694174, 0.50224377])
         
         */
-        let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
-        //let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
-        let e_norm = (expected.iter().fold(0.0, |acc, num| acc + num * num) as f32).sqrt();
         
-        let tol = 0.001;
-        let h = compute_hypergraph(&data);
-        let centrality = h.eigenvector_centrality(10, tol);
-        let c_norm = (centrality.iter().fold(0.0, |acc, num| acc + num * num) as f32).sqrt();
+        let data = array![
+            [1, 0, 1, 0],
+            [0, 1, 0, 0],
+            [0, 1, 0, 1],
+            [0, 1, 1, 1],
+            [1, 1, 1, 1]
+        ];        
         
-        println!("{:?}", expected.iter().map(|x| x / e_norm).collect::<Vec<_>>());
-        println!("{:?}", centrality.iter().map(|x| x / c_norm).collect::<Vec<_>>());
+        //let h = compute_hypergraph(&data);
+
+        let h = Hypergraph {
+            incidence_matrix: array![[0, 1, 0, 1],
+                 [1, 1, 0, 0],
+                 [1, 0, 1, 1],
+                 [0, 0, 1, 1],
+                 [1, 1, 0, 1],
+                 [0, 1, 1, 0],
+                 [1, 0, 0, 1],
+                 [1, 1, 1, 1],
+                 [0, 1, 1, 1],
+                 [1, 1, 1, 0],
+                 [1, 0, 1, 0]],
+            edge_weights: vec![1.0, 0.5, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 0.5, 0.6666667, 0.5, 1.0],
+            node_weights: vec![0.4, 0.8, 0.6, 0.6],
+            edge_list: vec![vec![1, 3], vec![0, 1], vec![0, 2, 3], vec![2, 3], vec![0, 1, 3], vec![1, 2], vec![0, 3], vec![0, 1, 2, 3], vec![1, 2, 3], vec![0, 1, 2], vec![0, 2]],
+            node_list: vec![0, 1, 2, 3],
+        };
+
+
+        println!("{:?}", h);
+
         
         
-        assert!(
-            (expected.iter().map(|x| x / e_norm)  //.collect::<Vec<_>>(), 
-                .zip(centrality.iter().map(|x| x / c_norm).collect::<Vec<_>>())
-                .map(|(x, y)| (x - y).powf(2.0))
-                .sum::<f32>() / expected.len() as f32) < tol
-                //.all(|x| x)
+        
+        //let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
+        let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
+        
+        //let e_norm = (expected.iter().fold(0.0, |acc, num| acc + num * num) as f32).sqrt();
+        
+        let tol = 0.00001;
+        let max_iterations = 50;
+        
+        //let h = compute_hypergraph(&data);
+        let centrality = h.eigenvector_centrality(max_iterations, tol);
+        //let c_norm = (centrality.iter().fold(0.0, |acc, num| acc + num * num) as f32).sqrt();
+        
+        println!("{:?}", expected);
+        println!("{:?}", centrality);
+        
+        let rms_error = expected.iter()//.map(|x| x / e_norm)  //.collect::<Vec<_>>(), 
+            .zip(&centrality/*.iter().map(|x| x / c_norm).collect::<Vec<_>>()*/)
+            .map(|(x, y)| (x - y).powf(2.0))
+            .sum::<f32>()
+            .sqrt() / expected.len() as f32;
+            
+        println!("{:?}", rms_error);
+        
+        println!("{:?}", expected.iter() 
+            .zip(centrality)
+            .map(|(x, y)| (x - y))
+            .collect::<Vec<_>>()
         );
+        
+        assert!(rms_error < tol);
     }
 }
