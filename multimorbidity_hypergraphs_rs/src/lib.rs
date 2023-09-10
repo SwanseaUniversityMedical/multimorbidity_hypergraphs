@@ -904,8 +904,6 @@ mod tests {
             .map(|x| x)
             .collect();
         
-        let (eig_vals, eig_vecs) = adj.eig();
-        
         //let res = adjacency_matrix_times_vector(&inc_mat.view(), &weight, &vector);
         let res = iterate_vector_loop(&inc_mat.view(), &weight, &vector);
         println!("{:?}", expected);
@@ -1010,11 +1008,34 @@ mod tests {
 
         println!("{:?}", h);
 
+        let inc_mat = h.incidence_matrix.mapv(|x| f64::from(x));
+
+        let big_mess = inc_mat.t()
+                .dot(&Array::from_diag(&arr1(&h.edge_weights)))
+                .dot(&inc_mat);
+      
+        let adj = &big_mess -  Array::from_diag(&big_mess.diag());
+        let (eig_vals, eig_vecs) = adj.eig().unwrap();
         
+        let max_val = eig_vals
+            .mapv(|x| x.re)
+            .into_iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
         
+        let max_index = eig_vals
+            .mapv(|x| x.re)
+            .iter()
+            .position(|x| *x == max_val)
+            .unwrap();
+        
+        let expected = eig_vecs
+            .index_axis(Axis(1), max_index)
+            .iter().map(|x| x.re.abs())
+            .collect::<Vec<_>>();
         
         //let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
-        let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
+        //let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
         
         //let e_norm = (expected.iter().fold(0.0, |acc, num| acc + num * num) as f64).sqrt();
         

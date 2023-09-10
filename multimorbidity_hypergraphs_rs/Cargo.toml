@@ -13,5 +13,5 @@ rand = "0.8.5"
 ndarray-rand = "0.14.0"
 
 [dependencies.ndarray-linalg]
-version = '0.12.0'
+version = '0.16.0'
 features = ['intel-mkl']
