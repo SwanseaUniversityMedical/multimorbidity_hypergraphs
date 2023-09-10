@@ -164,7 +164,7 @@ fn standard_deviation(data: Vec<f64>, m: f64) -> f64 {
 
 }
 
-
+/*
 fn iterate_vector_loop(
     incidence_matrix: &ArrayView2<f64>,
     weight: &Vec<f64>,
@@ -216,16 +216,11 @@ fn iterate_vector_loop(
         
         return result;
         
-        
-        
-        
     } else {
         panic!("The incidence matrix has the wrong shape.");
-    }  
-
-    
-
+    }
 }
+*/
 
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f64>,
@@ -235,7 +230,6 @@ fn adjacency_matrix_times_vector(
 
     if let [outer, inner] = &incidence_matrix.shape() {
         
-        //println!("{}, {}", outer, inner);
         
         let weighted_incidence: Array2<f64> = Array::from_shape_vec((*outer, *inner), 
             (0..outer*inner)
@@ -244,7 +238,6 @@ fn adjacency_matrix_times_vector(
                 .collect()
         ).unwrap();
 
-        //println!("wi = {:?}", weighted_incidence);
         
         let intermediate: Vec<f64> = (0..*outer)
             .into_par_iter()
@@ -255,7 +248,6 @@ fn adjacency_matrix_times_vector(
             })
             .collect();
             
-        //println!("inter = {:?}", intermediate);
         
         let term_1: Vec<f64> = (0..*inner)
             .into_par_iter()
@@ -266,8 +258,6 @@ fn adjacency_matrix_times_vector(
             })
             .collect();
             
-        //println!("term_1 = {:?}", term_1);
-            
         let subt: Vec<f64> = (0..*inner)
             .map(|i| {
                 (0..*outer)
@@ -277,23 +267,10 @@ fn adjacency_matrix_times_vector(
             })
             .collect();
             
-        //println!("subt = {:?}", subt);
-            
-        /*let vector: Vec<f64> = */(0..term_1.len())
+        (0..term_1.len())
             .into_par_iter()
             .map(|i| term_1[i] - subt[i])
-            .collect()/*;
-    
-        let norm = vector
-            .iter()
-            .map(|&x| x.powf(2.0))
-            .sum::<f64>()
-            .sqrt();
-    
-        vector
-            .iter()
-            .map(|&x| x / norm)
-            .collect()*/
+            .collect()
 
     } else {
         panic!("The incidence matrix has the wrong shape.");
@@ -302,7 +279,7 @@ fn adjacency_matrix_times_vector(
 }
 
 
-fn EVC_iteration(
+fn evc_iteration(
     inc_mat: ArrayView2<f64>, 
     weight: &Vec<f64>, 
     eigenvector: Vec<f64>,
@@ -315,7 +292,7 @@ fn EVC_iteration(
     
     println!("{:?}", eigenvector);
     
-    let mut eigenvector_new = iterate_vector_loop(//adjacency_matrix_times_vector(
+    let mut eigenvector_new = adjacency_matrix_times_vector(
         &inc_mat,
         weight,
         &eigenvector,
@@ -339,19 +316,15 @@ fn EVC_iteration(
         .sum::<f64>()
         .sqrt();
     
-    //println!("{}", err_estimate);
-    
-    //let norm = eigenvector_new.iter().fold(0., |sum, &num| sum + num*num).sqrt();
-    
-    
+  
     if (err_estimate < tolerance) | (iter_no > max_iterations) {
         println!("Converged in {} iterations", iter_no);
         eigenvector_new 
     } else {
-        EVC_iteration(
+        evc_iteration(
             inc_mat,
             weight,
-            eigenvector_new,//.iter().map(|&b| b / norm).collect(),
+            eigenvector_new,
             tolerance,
             iter_no + 1,
             max_iterations
@@ -376,13 +349,6 @@ impl Hypergraph {
     ) -> Vec<f64> {
         
         
-        // TODO - 
-        // 1a) set up initialisation - DONE
-        // weighted resultant (and test) - DONE
-        // 1b) figure out the initialisation for the different graph reps
-        // 2a) figure out if I need a test for a single pass through the recursive function
-        // 2b) write recursive function to take the place of the loop        
-        
         let tmp_inc_mat = &self.incidence_matrix;
         let im_dims = tmp_inc_mat.shape();
 
@@ -397,16 +363,7 @@ impl Hypergraph {
         let norm = eigenvector.iter().fold(0., |sum, &num| sum + num*num).sqrt();
         eigenvector = eigenvector.iter().map(|&b| b / norm).collect();
 
-        /*
-        let mut inc_mat :Array2<f64> = Array::zeros(self.incidence_matrix.raw_dim());
-        
-        for i in (0..self.incidence_matrix.nrows()) {
-            for j in (0..self.incidence_matrix.ncols()) {
-                inc_mat[[i, j]] = self.incidence_matrix[[i, j]] as f64 * self.node_weights[j].sqrt();
-            }
-        }
-        */
-        
+
         let inc_mat = self.incidence_matrix
             .mapv(|x| f64::from(x))
             .dot(&Array::from_diag(&arr1(
@@ -418,8 +375,8 @@ impl Hypergraph {
             )
         );
 
-        /*
-        EVC_iteration(
+        
+        evc_iteration(
             inc_mat.view(),
             &self.edge_weights,
             eigenvector,
@@ -427,88 +384,6 @@ impl Hypergraph {
             0,
             max_iterations,
         )
-        */
-
-        let mut eigenvector_new = eigenvector.clone();
-
-        for iteration in 0..max_iterations {
-            
-            println!("{:?}", &self.edge_weights);
-
-            eigenvector_new = adjacency_matrix_times_vector(
-                &inc_mat.view(),
-                &self.edge_weights,
-                &eigenvector,
-            );
-            let evnew_norm = eigenvector_new
-                .iter()
-                .map(|x| x.powf(2.0))
-                .sum::<f64>()
-                .sqrt();
-            
-            eigenvector_new = eigenvector_new
-                .iter() 
-                .map(|x| x / evnew_norm)
-                .collect::<Vec<_>>();
-
-            let mse = eigenvector
-                .iter()
-                .zip(&eigenvector_new)
-                .map(|(x, y)| (x-y).powf(2.0))
-                .sum::<f64>()
-                .sqrt();
-
-            if (mse < tolerance) | (iteration > max_iterations) {
-                println!("Converged after {} iterations", iteration + 1);
-                break;
-            }
-            
-            eigenvector = eigenvector_new.clone();
-            
-            /*
-
-            // calculate the eigenvalue estimate:
-            // 1) find all values of eigenvector_new > 0
-
-            let mut iter_eigenvalue: Vec<f64> = eigenvector_new.iter().zip(
-                eigenvector_old.iter()
-            ).map(|(&a, &b)| {
-                    let mut out = 0.0;
-                    if b > 1e-6 {
-                        out = a / b;
-                    } 
-                    out
-                }
-            ).collect();
-            iter_eigenvalue.retain(|&b| b > 0.0);
-
-            //println!("{:?}", iter_eigenvalue);
-
-            // 2) estimate = mean( #1 above )
-            eigenvalue = iter_eigenvalue.iter().sum::<f64>() / (iter_eigenvalue.len() as f64);
-
-            // 3) error estimate = std( #1 above)    
-            let err_estimate = standard_deviation(iter_eigenvalue, eigenvalue); 
-
-
-            // 4) termination condition: if error_estimate / eigenvector_estimate < tolerance
-                     
-            if err_estimate / eigenvalue < tolerance {
-                println!("Converged after {} iterations", iteration + 1);
-                break;
-            } 
-
-
-            let norm = eigenvector_new.iter().fold(0., |sum, &num| sum + num*num).sqrt();
-            eigenvector_old = eigenvector_new.iter().map(|&b| b / norm).collect();
-            */
-
-        }
-
-
-        //(eigenvalue, PyArray::from_vec(py, eigenvector_new))
-        eigenvector_new
-    
     }
     
 }
@@ -880,8 +755,6 @@ mod tests {
             assert!((x - y).abs() < 1e-6);
         }
         
-        //assert!(false);
-        
     }
     
     #[test]
@@ -912,8 +785,8 @@ mod tests {
             .map(|x| x)
             .collect();
         
-        //let res = adjacency_matrix_times_vector(&inc_mat.view(), &weight, &vector);
-        let res = iterate_vector_loop(&inc_mat.view(), &weight, &vector);
+        let res = adjacency_matrix_times_vector(&inc_mat.view(), &weight, &vector);
+
         println!("{:?}", expected);
         println!("{:?}", res);
         
@@ -953,23 +826,23 @@ mod tests {
         let inc_mat = h.incidence_matrix.mapv(|x| f64::from(x));
 
         let big_mess = Array::from_diag(&arr1(&
+                h.node_weights
+                    .iter()
+                    .map(|x| x.sqrt())
+                    .collect::<Vec<_>>()
+                )
+            )
+            .dot(&inc_mat.t())
+            .dot(&Array::from_diag(&arr1(&h.edge_weights)))
+            .dot(&inc_mat)
+            .dot(&Array::from_diag(&arr1(&
                     h.node_weights
                         .iter()
                         .map(|x| x.sqrt())
                         .collect::<Vec<_>>()
                     )
                 )
-                .dot(&inc_mat.t())
-                .dot(&Array::from_diag(&arr1(&h.edge_weights)))
-                .dot(&inc_mat)
-                .dot(&Array::from_diag(&arr1(&
-                        h.node_weights
-                            .iter()
-                            .map(|x| x.sqrt())
-                            .collect::<Vec<_>>()
-                        )
-                    )
-                );
+            );
       
         let adj = &big_mess -  Array::from_diag(&big_mess.diag());
         let (eig_vals, eig_vecs) = adj.eig().unwrap();
@@ -1015,4 +888,10 @@ mod tests {
         
         assert!(rms_error < tol);
     }
+    
+    // Tests needed
+    // 1 - eigenvector centrality with a random initial dataset
+    // 2 - eigenvector centrality of the dual representation
+    // 3 - eigenvector centrality of the bipartite representation
+    // 4 - POSSIBLY: a single pass through the recursive function evc_iteration
 }
