@@ -408,7 +408,15 @@ impl Hypergraph {
         */
         
         let inc_mat = self.incidence_matrix
-            .mapv(|x| f64::from(x));
+            .mapv(|x| f64::from(x))
+            .dot(&Array::from_diag(&arr1(
+                &self.node_weights
+                    .iter()
+                    .map(|x| x.sqrt())
+                    .collect::<Vec<_>>()
+                )
+            )
+        );
 
         /*
         EVC_iteration(
@@ -918,75 +926,11 @@ mod tests {
     }
     
     #[test]
-    fn eigenvector_centrality_t () {
+    fn eigenvector_centrality_manual_t () {
         
         // test the computation of the eigenvector centrality
         // NOTE(jim): Only calculating the weighted resultant: sqrt(w_n) * M^T * w_e * M * sqrt(w_n)
         
-        // Note(jim): the following python code was used to calculate the exoected value:
-        /* `python 
-        
-        import numpy as np 
-        inc_mat = np.array([[1, 1, 1, 1],
-            [0, 0, 1, 1],
-            [1, 0, 1, 1],
-            [1, 1, 1, 0],
-            [0, 1, 0, 1],
-            [1, 0, 0, 1],
-            [0, 1, 1, 0],
-            [1, 1, 0, 0],
-            [0, 1, 1, 1],
-            [1, 1, 0, 1],
-            [1, 0, 1, 0]]
-        )
-        w_e = np.array([0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0])
-        w_n = np.array([0.4, 0.8, 0.6, 0.6])
-        
-        a = np.sqrt(np.diag(w_n)).dot(inc_mat.T).dot(np.diag(w_e)).dot(inc_mat).dot(np.diag(w_n))
-        np.fill_diagonal(a, 0.0)
-        e_vals, e_vecs = np.linalg.eig(a)
-        np.abs(e_vecs[:, np.where((e_vals == e_vals.max()))[0][0]])
-        
-        output: array([0.43576871, 0.52442996, 0.51250412, 0.52193714])
-        
-        
-        NOT weighted resultant
-        
-        import numpy as np 
-        inc_mat = np.array([[0, 1, 0, 1],
-                 [1, 1, 0, 0],
-                 [1, 0, 1, 1],
-                 [0, 0, 1, 1],
-                 [1, 1, 0, 1],
-                 [0, 1, 1, 0],
-                 [1, 0, 0, 1],
-                 [1, 1, 1, 1],
-                 [0, 1, 1, 1],
-                 [1, 1, 1, 0],
-                 [1, 0, 1, 0]]
-        )
-        w_e = np.array([1.0, 0.5, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 0.5, 0.6666667, 0.5, 1.0])
-        w_n = np.array([0.4, 0.8, 0.6, 0.6])
-        
-        a = np.sqrt(inc_mat.T.dot(np.diag(w_e)).dot(inc_mat))
-        np.fill_diagonal(a, 0.0)
-        e_vals, e_vecs = np.linalg.eig(a)
-        np.abs(e_vecs[:, np.where((e_vals == e_vals.max()))[0][0]])
-        
-        output: array([0.48837738, 0.50224377, 0.50694174, 0.50224377])
-        
-        */
-        
-        let data = array![
-            [1, 0, 1, 0],
-            [0, 1, 0, 0],
-            [0, 1, 0, 1],
-            [0, 1, 1, 1],
-            [1, 1, 1, 1]
-        ];        
-        
-        //let h = compute_hypergraph(&data);
-
         let h = Hypergraph {
             incidence_matrix: array![[0, 1, 0, 1],
                  [1, 1, 0, 0],
@@ -1006,13 +950,26 @@ mod tests {
         };
 
 
-        println!("{:?}", h);
-
         let inc_mat = h.incidence_matrix.mapv(|x| f64::from(x));
 
-        let big_mess = inc_mat.t()
+        let big_mess = Array::from_diag(&arr1(&
+                    h.node_weights
+                        .iter()
+                        .map(|x| x.sqrt())
+                        .collect::<Vec<_>>()
+                    )
+                )
+                .dot(&inc_mat.t())
                 .dot(&Array::from_diag(&arr1(&h.edge_weights)))
-                .dot(&inc_mat);
+                .dot(&inc_mat)
+                .dot(&Array::from_diag(&arr1(&
+                        h.node_weights
+                            .iter()
+                            .map(|x| x.sqrt())
+                            .collect::<Vec<_>>()
+                        )
+                    )
+                );
       
         let adj = &big_mess -  Array::from_diag(&big_mess.diag());
         let (eig_vals, eig_vecs) = adj.eig().unwrap();
@@ -1034,23 +991,16 @@ mod tests {
             .iter().map(|x| x.re.abs())
             .collect::<Vec<_>>();
         
-        //let expected = vec![0.43576871, 0.52442996, 0.51250412, 0.52193714];
-        //let expected = vec![0.48837738, 0.50224377, 0.50694174, 0.50224377];
-        
-        //let e_norm = (expected.iter().fold(0.0, |acc, num| acc + num * num) as f64).sqrt();
-        
         let tol = 0.00001;
         let max_iterations = 50;
         
-        //let h = compute_hypergraph(&data);
         let centrality = h.eigenvector_centrality(max_iterations, tol);
-        //let c_norm = (centrality.iter().fold(0.0, |acc, num| acc + num * num) as f64).sqrt();
         
         println!("{:?}", expected);
         println!("{:?}", centrality);
         
-        let rms_error = expected.iter()//.map(|x| x / e_norm)  //.collect::<Vec<_>>(), 
-            .zip(&centrality/*.iter().map(|x| x / c_norm).collect::<Vec<_>>()*/)
+        let rms_error = expected.iter()
+            .zip(&centrality)
             .map(|(x, y)| (x - y).powf(2.0))
             .sum::<f64>()
             .sqrt() / expected.len() as f64;
