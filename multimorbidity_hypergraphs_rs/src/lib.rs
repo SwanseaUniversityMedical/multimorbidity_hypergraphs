@@ -327,6 +327,11 @@ fn evc_iteration(
     }   
 }
 
+pub enum Representation {
+    Standard,
+    Dual,
+}
+
 #[derive(Debug)]
 pub struct Hypergraph {
     incidence_matrix: Array2<u8>, 
@@ -341,6 +346,7 @@ impl Hypergraph {
         &self, 
         max_iterations: u32,
         tolerance: f64,
+        rep: Representation,
     ) -> Vec<f64> {
         
         
@@ -865,7 +871,11 @@ mod tests {
         let tol = 0.00001;
         let max_iterations = 50;
         
-        let centrality = h.eigenvector_centrality(max_iterations, tol);
+        let centrality = h.eigenvector_centrality(
+            max_iterations, 
+            tol, 
+            Representation::Standard
+        );
         
         println!("{:?}", expected);
         println!("{:?}", centrality);
@@ -944,7 +954,11 @@ mod tests {
         let tol = 0.00001;
         let max_iterations = 50;
         
-        let res = h.eigenvector_centrality(max_iterations, tol);
+        let res = h.eigenvector_centrality(
+            max_iterations, 
+            tol,
+            Representation::Standard
+        );
         
         println!("{:?}", expected);
         println!("{:?}", res);
@@ -965,6 +979,82 @@ mod tests {
         
         assert!(rms_error < tol);
     }
+    
+    
+   #[test]
+   fn eigenvector_centrality_dual_rep_t () {
+        
+        let n_diseases = 10;
+        let n_subjects = 15;
+        
+        let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
+            .mapv(|x| x as u8);
+        
+        let h = compute_hypergraph(&data);
+        
+        let big_mess = Array::from_diag(&arr1(&
+                h.edge_weights
+                    .iter()
+                    .map(|x| x.sqrt())
+                    .collect::<Vec<_>>()
+                )
+            )
+            .dot(&h.incidence_matrix.mapv(|x| f64::from(x)))
+            .dot(&Array::from_diag(&arr1(&h.node_weights)))
+            .dot(&h.incidence_matrix.t().mapv(|x| f64::from(x)))
+            .dot(&Array::from_diag(&arr1(&
+                    h.edge_weights
+                        .iter()
+                        .map(|x| x.sqrt())
+                        .collect::<Vec<_>>()
+                    )
+                )
+            ); 
+            
+        let adj = &big_mess -  Array::from_diag(&big_mess.diag());
+        let (eig_vals, eig_vecs) = adj.eig().unwrap();
+        
+        let max_val = eig_vals
+            .mapv(|x| x.re)
+            .into_iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        
+        let max_index = eig_vals
+            .mapv(|x| x.re)
+            .iter()
+            .position(|x| *x == max_val)
+            .unwrap();
+        
+        let expected = eig_vecs
+            .index_axis(Axis(1), max_index)
+            .iter().map(|x| x.re.abs())
+            .collect::<Vec<_>>();        
+        let tol = 0.00001;
+        let max_iterations = 50;
+        
+        let res = h.eigenvector_centrality(
+            max_iterations, 
+            tol,
+            Representation::Dual,
+        );
+        
+        let rms_error = expected.iter()
+            .zip(&res)
+            .map(|(x, y)| (x - y).powf(2.0))
+            .sum::<f64>()
+            .sqrt() / expected.len() as f64;
+            
+        println!("{:?}", rms_error);
+        
+        println!("{:?}", expected.iter() 
+            .zip(res)
+            .map(|(x, y)| (x - y))
+            .collect::<Vec<_>>()
+        );
+        
+        assert!(rms_error < tol);
+   }
 }
 
 
