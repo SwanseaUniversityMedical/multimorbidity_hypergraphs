@@ -239,7 +239,7 @@ fn evc_iteration(
     
   
     if (err_estimate < tolerance) | (iter_no > max_iterations) {
-        println!("Converged in {} iterations", iter_no);
+        //println!("Converged in {} iterations", iter_no);
         eigenvector_new 
     } else {
         evc_iteration(
@@ -341,6 +341,8 @@ impl Hypergraph {
     }
     
 }
+
+
 
 // Idiomatic rust is apparently to have tests and code in the same file
 #[cfg(test)]
@@ -852,7 +854,7 @@ mod tests {
     
     // TODO - Tests needed
     // 1 - eigenvector centrality with a random initial dataset - DONE
-    // 2 - eigenvector centrality of the dual representation
+    // 2 - eigenvector centrality of the dual representation - DONE
     // 3 - eigenvector centrality of the bipartite representation
     // 4 - POSSIBLY: a single pass through the recursive function evc_iteration
     
@@ -1013,5 +1015,3 @@ mod tests {
         assert!(rms_error < tol);
    }
 }
-
-

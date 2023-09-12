@@ -15,3 +15,10 @@ ndarray-rand = "0.14.0"
 [dependencies.ndarray-linalg]
 version = '0.16.0'
 features = ['intel-mkl']
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "my_benchmark"
+harness = false
