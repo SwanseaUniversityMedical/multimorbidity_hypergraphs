@@ -145,78 +145,6 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
 }
 
-/*
-fn standard_deviation(data: Vec<f64>, m: f64) -> f64 {
-
-    let variance = data.iter().map(|value| {
-        let diff = m - (value);
-
-        diff * diff
-    }).sum::<f64>() / data.len() as f64;
-
-
-    variance.sqrt()
-
-}
-*/
-/*
-fn iterate_vector_loop(
-    incidence_matrix: &ArrayView2<f64>,
-    weight: &Vec<f64>,
-    vector: &Vec<f64>,
-) -> Vec<f64> {
-
-    if let [outer, inner] = &incidence_matrix.shape() {
-        
-        println!("{}, {}", outer, inner);
-        
-        let mut weighted_incidence: Array2<f64> = Array::zeros((*outer, *inner));
-        for i in 0..*outer {
-            for j in 0..*inner {
-                weighted_incidence[[i, j]] += incidence_matrix[[i, j]] * weight[i];
-            }
-        }
-        
-        let mut intermediate = vec![0.0; *outer];
-
-        println!("{}", vector.len());
-        
-        for k in 0..*outer {
-            for j in 0..*inner {
-                intermediate[k] += weighted_incidence[[k, j]] * vector[j];
-            }
-        }        
-        
-        let mut term_1 = vec![0.0; vector.len()];
-
-        for i in 0..*inner {
-            for k in 0..*outer {
-                term_1[i] += incidence_matrix[[k, i]] * intermediate[k];
-            }
-        }
-        
-        let mut subt = vec![0.0; vector.len()];
-    
-        for i in 0..*inner {
-            for k in 0..*outer {
-                subt[i] += incidence_matrix[[k, i]] * weighted_incidence[[k, i]] * vector[i];
-            }
-        }
-        
-        let mut result = vec![0.0; vector.len()];
-
-        for i in 0..vector.len() {
-            result[i] = term_1[i] - subt[i];
-        }
-        
-        return result;
-        
-    } else {
-        panic!("The incidence matrix has the wrong shape.");
-    }
-}
-*/
-
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f64>,
     weight: &Vec<f64>,
@@ -285,8 +213,6 @@ fn evc_iteration(
     
     // 1) perform an iteration
     
-    println!("{:?}", eigenvector);
-    
     let mut eigenvector_new = adjacency_matrix_times_vector(
         &inc_mat,
         weight,
@@ -341,6 +267,18 @@ pub struct Hypergraph {
     node_list: Vec<usize>, 
 }
 
+fn normalised_vector_init(len: usize) -> Vec<f64> {
+    
+    let mut rng = rand::thread_rng();
+    
+    // TODO - figure out if this can be done in one step without mutability.
+    let mut vector: Vec<f64> = (0..len)
+        .map(|_| rng.gen_range(0.0..1.0))
+        .collect();
+    let norm = vector.iter().fold(0., |sum, &num| sum + num.powf(2.0)).sqrt();
+    vector.iter().map(|&b| b / norm).collect()
+}
+
 impl Hypergraph {
     pub fn eigenvector_centrality(
         &self, 
@@ -353,33 +291,48 @@ impl Hypergraph {
         let tmp_inc_mat = &self.incidence_matrix;
         let im_dims = tmp_inc_mat.shape();
 
-        // generate a random initial estimate for the eigenvector.
-        // Possibly slow but only has to be done once.
-        let mut rng = rand::thread_rng();
         
-        // TODO - see if this can be done in one step without mutability.
-        let mut eigenvector: Vec<f64> = (0..im_dims[1])
-            .map(|_| rng.gen_range(0.0..1.0))
-            .collect();
-        let norm = eigenvector.iter().fold(0., |sum, &num| sum + num*num).sqrt();
-        eigenvector = eigenvector.iter().map(|&b| b / norm).collect();
-
-
-        let inc_mat = self.incidence_matrix
-            .mapv(|x| f64::from(x))
-            .dot(&Array::from_diag(&arr1(
-                &self.node_weights
-                    .iter()
-                    .map(|x| x.sqrt())
-                    .collect::<Vec<_>>()
-                )
-            )
-        );
-
         
+        let (eigenvector, inc_mat, weights) = match rep {
+            
+            Representation::Standard => (
+                normalised_vector_init(im_dims[1]),
+                
+                self.incidence_matrix
+                    .mapv(|x| f64::from(x))
+                    .dot(&Array::from_diag(&arr1(
+                        &self.node_weights
+                            .iter()
+                            .map(|x| x.sqrt())
+                            .collect::<Vec<_>>()
+                        )
+                    )
+                ),
+                
+                &self.edge_weights,
+            ),
+            
+            Representation::Dual => (
+                normalised_vector_init(im_dims[0]),
+                
+                self.incidence_matrix.t()
+                    .mapv(|x| f64::from(x))
+                    .dot(&Array::from_diag(&arr1(
+                        &self.edge_weights
+                            .iter()
+                            .map(|x| x.sqrt())
+                            .collect::<Vec<_>>()
+                        )
+                    )
+                ),
+                
+                &self.node_weights,
+            ),
+        };
+    
         evc_iteration(
             inc_mat.view(),
-            &self.edge_weights,
+            weights,
             eigenvector,
             tolerance,
             0,
@@ -1045,7 +998,11 @@ mod tests {
             .sum::<f64>()
             .sqrt() / expected.len() as f64;
             
-        println!("{:?}", rms_error);
+        println!("{:?}", expected);
+        println!("{:?}", res);
+        
+        
+        println!("\n {:?}", rms_error);
         
         println!("{:?}", expected.iter() 
             .zip(res)
