@@ -33,6 +33,8 @@ pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
         .map(|x| overlap_coefficient(data.select(Axis(1), [*x].as_slice()).view()))
         .collect::<Vec<_>>();
     
+    println!("{} {}", &edge_list.len(), &node_list.len());
+    
     Hypergraph {
         incidence_matrix: inc_mat, 
         edge_weights: compute_edge_weights(&data, &edge_list),
@@ -147,8 +149,58 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
 
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f64>,
-    weight: &Vec<f64>,
-    vector: &Vec<f64>,
+    weight: &[f64],
+    vector: &[f64],
+) -> Vec<f64> {
+
+    if let [outer, inner] = &incidence_matrix.shape() {
+        
+        //println!("{}, {}", outer, inner);
+        
+        let mut weighted_incidence: Array2<f64> = Array::zeros((*outer, *inner));
+        for i in 0..*outer * *inner {
+                weighted_incidence[[i / inner, i % inner]] += incidence_matrix[[i / inner, i % inner]] * weight[i / inner];
+        }
+        
+        let mut intermediate = vec![0.0; *outer];
+
+        //println!("{}", vector.len());
+        
+        for i in 0..*outer * *inner {
+            intermediate[i / inner] += weighted_incidence[[i / inner, i % inner]] * vector[i % inner];
+        }        
+        
+        let mut term_1 = vec![0.0; vector.len()];
+
+        
+        for i in 0..*outer * *inner {
+            term_1[i % inner] += incidence_matrix[[i / inner, i % inner]] * intermediate[i / inner];
+        }
+        
+        let mut subt = vec![0.0; vector.len()];
+    
+        for k in 0..*outer * *inner {
+                subt[k % inner] += incidence_matrix[[k / inner, k % inner]] * weighted_incidence[[k / inner, k % inner]] * vector[k % inner];
+        }
+        
+        let mut result = vec![0.0; vector.len()];
+
+        for i in 0..vector.len() {
+            result[i] = term_1[i] - subt[i];
+        }
+        
+        return result;
+        
+    } else {
+        panic!("The incidence matrix has the wrong shape.");
+    }
+}
+
+/*
+fn adjacency_matrix_times_vector(
+    incidence_matrix: &ArrayView2<f64>,
+    weight: &[f64],
+    vector: &[f64],
 ) -> Vec<f64> {
 
     if let [outer, inner] = &incidence_matrix.shape() {
@@ -163,7 +215,7 @@ fn adjacency_matrix_times_vector(
 
         
         let intermediate: Vec<f64> = (0..*outer)
-            .into_par_iter()
+            .into_iter()
             .map(|k| {
                 (0..*inner)
                     .map(|j| weighted_incidence[[k, j]] * vector[j])
@@ -173,7 +225,7 @@ fn adjacency_matrix_times_vector(
             
         
         let term_1: Vec<f64> = (0..*inner)
-            .into_par_iter()
+            .into_iter()
             .map(|i| {
                 (0..*outer)
                     .map(|k| incidence_matrix[[k, i]] * intermediate[k])
@@ -184,14 +236,14 @@ fn adjacency_matrix_times_vector(
         let subt: Vec<f64> = (0..*inner)
             .map(|i| {
                 (0..*outer)
-                    .into_par_iter()
+                    .into_iter()
                     .map(|k| (incidence_matrix[[k, i]] as f64) * weighted_incidence[[k, i]] * vector[i])
                     .sum()
             })
             .collect();
             
         (0..term_1.len())
-            .into_par_iter()
+            .into_iter()
             .map(|i| term_1[i] - subt[i])
             .collect()
 
@@ -201,7 +253,7 @@ fn adjacency_matrix_times_vector(
 
 }
 
-
+*/
 fn evc_iteration(
     inc_mat: ArrayView2<f64>, 
     weight: &Vec<f64>, 
@@ -341,7 +393,6 @@ impl Hypergraph {
     }
     
 }
-
 
 
 // Idiomatic rust is apparently to have tests and code in the same file
@@ -1015,3 +1066,4 @@ mod tests {
         assert!(rms_error < tol);
    }
 }
+
