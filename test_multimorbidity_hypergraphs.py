@@ -808,29 +808,102 @@ def test_non_standard_weight_function_node_and_edge_weights_with_optional_argume
     assert (h.edge_weights == 1/2).all()
     assert (h.node_weights == 1/2).all()
 
+def test_iterate_vector():
 
-def test_benchmarking_compute_hypergraph(benchmark):
+    inc_mat = np.array([[1.0, 1.0, 1.0, 1.0],
+        [0.0, 0.0, 1.0, 1.0],
+        [1.0, 0.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 1.0],
+        [0.0, 1.0, 1.0, 0.0],
+        [1.0, 1.0, 0.0, 0.0],
+        [0.0, 1.0, 1.0, 1.0],
+        [1.0, 1.0, 0.0, 1.0],
+        [1.0, 0.0, 1.0, 0.0]])
+    
+    w_e = np.array([0.5, 0.6666667, 0.5, 0.5, 1.0, 0.5, 0.6666667, 0.5, 0.6666667, 0.5, 1.0])
+    vector = np.array([0.5, 0.5, 0.5, 0.5])
+    
+    result = hgt.hypergraph_tools._iterate_vector(inc_mat, w_e, vector)
 
-    n_people = 5000
-    n_diseases = 10
+    big_mess = inc_mat.T.dot(np.diag(w_e)).dot(inc_mat)
+    
+    adj = big_mess - np.diag(np.diag(big_mess))
+    expected = adj.dot(vector)
 
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
-    )
+    print(expected)
+    print(result)
 
-    h = hgt.Hypergraph()
-    benchmark(
-        h.compute_hypergraph,
-        data_pd
-    )
+    for (x, y) in zip(result, expected):
+        assert(x - y < 1e-6)
 
 
-def test_benchmarking_eigenvector_centrality(benchmark):
+# def test_benchmarking_compute_hypergraph(benchmark):
 
-    n_people = 5000
+    # n_people = 5000
+    # n_diseases = 10
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph()
+    # benchmark(
+        # h.compute_hypergraph,
+        # data_pd
+    # )
+
+
+# def test_benchmarking_eigenvector_centrality(benchmark):
+
+    # n_people = 5000
+    # n_diseases = 10
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph()
+    # h.compute_hypergraph(data_pd)
+
+    # benchmark(
+        # h.eigenvector_centrality,
+        # "standard",
+        # True
+    # )
+
+
+# def test_benchmarking_eigenvector_centrality_dual(benchmark):
+
+    # n_people = 5000
+    # n_diseases = 10
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph()
+    # h.compute_hypergraph(data_pd)
+
+    # benchmark(
+        # h.eigenvector_centrality,
+        # "dual",
+        # True
+    # )
+    
+def test_benchmarking_eigenvector_centrality_100k_10(benchmark):
+
+    n_people = 100000
     n_diseases = 10
 
     data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
@@ -844,5 +917,176 @@ def test_benchmarking_eigenvector_centrality(benchmark):
     h.compute_hypergraph(data_pd)
 
     benchmark(
-        h.eigenvector_centrality
+        h.eigenvector_centrality,
+        "standard",
+        True
     )
+
+def test_benchmarking_eigenvector_centrality_100k_11(benchmark):
+
+    n_people = 100000
+    n_diseases = 11
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    benchmark(
+        h.eigenvector_centrality,
+        "standard",
+        True
+    )
+    
+def test_benchmarking_eigenvector_centrality_100k_12(benchmark):
+
+    n_people = 100000
+    n_diseases = 12
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    benchmark(
+        h.eigenvector_centrality,
+        "standard",
+        True
+    )
+
+def test_benchmarking_eigenvector_centrality_100k_13(benchmark):
+
+    n_people = 100000
+    n_diseases = 13
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    benchmark(
+        h.eigenvector_centrality,
+        "standard",
+        True
+    )
+
+def test_benchmarking_eigenvector_centrality_100k_14(benchmark):
+
+    n_people = 100000
+    n_diseases = 14
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    benchmark(
+        h.eigenvector_centrality,
+        "standard",
+        True
+    )
+
+def test_benchmarking_eigenvector_centrality_100k_15(benchmark):
+
+    n_people = 100000
+    n_diseases = 15
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pd.DataFrame(
+        data
+    ).rename(
+        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    )
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    benchmark(
+        h.eigenvector_centrality,
+        "standard",
+        True
+    )    
+# def test_benchmarking_eigenvector_centrality_dual_100k_10(benchmark):
+
+    # n_people = 100000
+    # n_diseases = 10
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph()
+    # h.compute_hypergraph(data_pd)
+
+    # benchmark(
+        # h.eigenvector_centrality,
+        # "dual",
+        # True
+    # )
+    
+    
+# def test_benchmarking_eigenvector_centrality_100k_15(benchmark):
+
+    # n_people = 100000
+    # n_diseases = 15
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph()
+    # h.compute_hypergraph(data_pd)
+
+    # benchmark(
+        # h.eigenvector_centrality,
+        # "standard",
+        # True
+    # )
+
+
+# def test_benchmarking_eigenvector_centrality_dual_100k_15(benchmark):
+
+    # n_people = 100000
+    # n_diseases = 15
+
+    # data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    # data_pd = pd.DataFrame(
+        # data
+    # ).rename(
+        # columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    # )
+
+    # h = hgt.Hypergraph()
+    # h.compute_hypergraph(data_pd)
+
+    # benchmark(
+        # h.eigenvector_centrality,
+        # "dual",
+        # True
+    # )    

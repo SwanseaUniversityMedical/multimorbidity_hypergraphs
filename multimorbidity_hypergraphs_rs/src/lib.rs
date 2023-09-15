@@ -33,7 +33,7 @@ pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
         .map(|x| overlap_coefficient(data.select(Axis(1), [*x].as_slice()).view()))
         .collect::<Vec<_>>();
     
-    println!("{} {}", &edge_list.len(), &node_list.len());
+    println!("{} {} {}", &edge_list.len(), &node_list.len(), &edge_list.len()*&node_list.len());
     
     Hypergraph {
         incidence_matrix: inc_mat, 
@@ -147,12 +147,14 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
 }
 
+/*
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f64>,
     weight: &[f64],
     vector: &[f64],
 ) -> Vec<f64> {
 
+    // Serial
     if let [outer, inner] = &incidence_matrix.shape() {
         
         //println!("{}, {}", outer, inner);
@@ -162,10 +164,10 @@ fn adjacency_matrix_times_vector(
                 weighted_incidence[[i / inner, i % inner]] += incidence_matrix[[i / inner, i % inner]] * weight[i / inner];
         }
         
+        
+        //println!("{}", vector.len());
         let mut intermediate = vec![0.0; *outer];
 
-        //println!("{}", vector.len());
-        
         for i in 0..*outer * *inner {
             intermediate[i / inner] += weighted_incidence[[i / inner, i % inner]] * vector[i % inner];
         }        
@@ -195,65 +197,63 @@ fn adjacency_matrix_times_vector(
         panic!("The incidence matrix has the wrong shape.");
     }
 }
+*/
 
-/*
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f64>,
     weight: &[f64],
     vector: &[f64],
 ) -> Vec<f64> {
-
+    // Threads with rayon 
     if let [outer, inner] = &incidence_matrix.shape() {
         
-        
+    
         let weighted_incidence: Array2<f64> = Array::from_shape_vec((*outer, *inner), 
             (0..outer*inner)
                 .into_par_iter()
-                .map(|i| (incidence_matrix[[i / inner, i % inner]] as f64) * weight[i / inner])
+                .map(|i| incidence_matrix[[i / inner, i % inner]] * weight[i / inner])
                 .collect()
         ).unwrap();
+        
+        
+        let intermediate = Array::from_shape_vec((*outer, *inner), 
+            (0..outer * inner)
+                .into_par_iter()
+                .map(|i| weighted_incidence[[i / inner, i % inner]] * vector[i % inner])
+                .collect()
+            ).unwrap()
+            .sum_axis(Axis(1));
 
         
-        let intermediate: Vec<f64> = (0..*outer)
-            .into_iter()
-            .map(|k| {
-                (0..*inner)
-                    .map(|j| weighted_incidence[[k, j]] * vector[j])
-                    .sum()
-            })
-            .collect();
-            
+        let term_1 = Array::from_shape_vec((*outer, *inner), 
+            (0..outer * inner)
+                .into_par_iter()
+                .map(|i| incidence_matrix[[i / inner, i % inner]] * intermediate[i / inner])
+                .collect()
+            ).unwrap()
+            .sum_axis(Axis(0));
         
-        let term_1: Vec<f64> = (0..*inner)
-            .into_iter()
-            .map(|i| {
-                (0..*outer)
-                    .map(|k| incidence_matrix[[k, i]] * intermediate[k])
-                    .sum()
-            })
-            .collect();
-            
-        let subt: Vec<f64> = (0..*inner)
-            .map(|i| {
-                (0..*outer)
-                    .into_iter()
-                    .map(|k| (incidence_matrix[[k, i]] as f64) * weighted_incidence[[k, i]] * vector[i])
-                    .sum()
-            })
-            .collect();
-            
-        (0..term_1.len())
-            .into_iter()
+
+        let subt = Array::from_shape_vec((*outer, *inner), 
+            (0..outer * inner)
+                .into_par_iter()
+                .map(|i| incidence_matrix[[i / inner, i % inner]] * weighted_incidence[[i / inner, i % inner]] * vector[i % inner])
+                .collect()
+            ).unwrap()
+            .sum_axis(Axis(0));
+        
+
+        (0..vector.len())
+            .into_par_iter()
             .map(|i| term_1[i] - subt[i])
             .collect()
-
+        
     } else {
         panic!("The incidence matrix has the wrong shape.");
     }
-
 }
 
-*/
+
 fn evc_iteration(
     inc_mat: ArrayView2<f64>, 
     weight: &Vec<f64>, 
@@ -323,8 +323,7 @@ fn normalised_vector_init(len: usize) -> Vec<f64> {
     
     let mut rng = rand::thread_rng();
     
-    // TODO - figure out if this can be done in one step without mutability.
-    let mut vector: Vec<f64> = (0..len)
+    let vector: Vec<f64> = (0..len)
         .map(|_| rng.gen_range(0.0..1.0))
         .collect();
     let norm = vector.iter().fold(0., |sum, &num| sum + num.powf(2.0)).sqrt();
@@ -1066,4 +1065,3 @@ mod tests {
         assert!(rms_error < tol);
    }
 }
-
