@@ -17,7 +17,7 @@ use ndarray::{
     Axis,
     arr1
 };
-
+use sprs::{CsMat, CsVec};
 use rand::Rng;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -204,26 +204,21 @@ fn adjacency_matrix_times_vector(
     vector: &[f32],
 ) -> Vec<f32> {
 
-    // ndarray-linalg - should have SIMD optimisations etc.
+    // ndarray-linalg / sprs.
     if let [outer, inner] = &incidence_matrix.shape() {
         
-        let mut weighted_incidence: Array2<f32> = Array::zeros((*outer, *inner));
-        for i in 0..*outer * *inner {
-                weighted_incidence[[i / inner, i % inner]] += incidence_matrix[[i / inner, i % inner]] * weight[i / inner];
-        }
+        let w: CsMat<f32> = CsMat::new(
+            (*outer, *outer),
+            (0..*outer+1).collect::<Vec<_>>(),
+            (0..*outer).collect::<Vec<_>>(),
+            weight.to_vec()
+        );
         
-        let mut intermediate = vec![0.0; *outer];
-
-        for i in 0..*outer * *inner {
-            intermediate[i / inner] += weighted_incidence[[i / inner, i % inner]] * vector[i % inner];
-        }        
+        let weighted_incidence = &w * incidence_matrix;
         
-        let mut term_1 = vec![0.0; vector.len()];
-
+        let intermediate = weighted_incidence.dot(&arr1(vector));
         
-        for i in 0..*outer * *inner {
-            term_1[i % inner] += incidence_matrix[[i / inner, i % inner]] * intermediate[i / inner];
-        }
+        let term_1 = intermediate.dot(incidence_matrix);
         
         let mut subt = vec![0.0; vector.len()];
     
@@ -238,7 +233,7 @@ fn adjacency_matrix_times_vector(
         }
         
         return result;
-        
+
     } else {
         panic!("The incidence matrix has the wrong shape.");
     }
