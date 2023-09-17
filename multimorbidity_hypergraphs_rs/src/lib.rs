@@ -2,6 +2,9 @@
 #[allow(dead_code)]
 #[allow(unused_imports)]
 
+extern crate blas_src;
+//extern crate blas;
+//extern crate openblas_src;
 
 use ndarray::{
     array, 
@@ -147,7 +150,7 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
 }
 
-
+/*
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f32>,
     weight: &[f32],
@@ -157,15 +160,58 @@ fn adjacency_matrix_times_vector(
     // Serial
     if let [outer, inner] = &incidence_matrix.shape() {
         
-        //println!("{}, {}", outer, inner);
+        let mut weighted_incidence: Array2<f32> = Array::zeros((*outer, *inner));
+        for i in 0..*outer * *inner {
+                weighted_incidence[[i / inner, i % inner]] += incidence_matrix[[i / inner, i % inner]] * weight[i / inner];
+        }
+        
+        let mut intermediate = vec![0.0; *outer];
+
+        for i in 0..*outer * *inner {
+            intermediate[i / inner] += weighted_incidence[[i / inner, i % inner]] * vector[i % inner];
+        }        
+        
+        let mut term_1 = vec![0.0; vector.len()];
+
+        
+        for i in 0..*outer * *inner {
+            term_1[i % inner] += incidence_matrix[[i / inner, i % inner]] * intermediate[i / inner];
+        }
+        
+        let mut subt = vec![0.0; vector.len()];
+    
+        for k in 0..*outer * *inner {
+                subt[k % inner] += incidence_matrix[[k / inner, k % inner]] * weighted_incidence[[k / inner, k % inner]] * vector[k % inner];
+        }
+        
+        let mut result = vec![0.0; vector.len()];
+
+        for i in 0..vector.len() {
+            result[i] = term_1[i] - subt[i];
+        }
+        
+        return result;
+        
+    } else {
+        panic!("The incidence matrix has the wrong shape.");
+    }
+}
+*/
+
+fn adjacency_matrix_times_vector(
+    incidence_matrix: &ArrayView2<f32>,
+    weight: &[f32],
+    vector: &[f32],
+) -> Vec<f32> {
+
+    // ndarray-linalg - should have SIMD optimisations etc.
+    if let [outer, inner] = &incidence_matrix.shape() {
         
         let mut weighted_incidence: Array2<f32> = Array::zeros((*outer, *inner));
         for i in 0..*outer * *inner {
                 weighted_incidence[[i / inner, i % inner]] += incidence_matrix[[i / inner, i % inner]] * weight[i / inner];
         }
         
-        
-        //println!("{}", vector.len());
         let mut intermediate = vec![0.0; *outer];
 
         for i in 0..*outer * *inner {
