@@ -3,6 +3,14 @@ name = "multimorbidity_hypergraphs_rs"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = [
+    'rlib',
+    'staticlib',
+    'cdylib',
+]
+
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -10,10 +18,9 @@ itertools = "0.11.0"
 rayon = "1.7.0"
 rand = "0.8.5"
 
-ndarray = { version = "0.15.0", features = ["blas"] }
-blas-src = { version = "0.8", features = ["openblas"] }
-openblas-src = { version = "0.10", features = ["cblas", "system"] }
-ndarray-linalg = { version = "0.14", features = ["openblas-system"] }
+intel-mkl-src = "*"
+ndarray = { version = "0.15", features = ["blas"] }
+ndarray-linalg = { version = "0.16", features = ["intel-mkl-static"] }
 ndarray-rand = "0.14.0"
 sprs = "0.11.1"
 
@@ -23,3 +30,4 @@ criterion = "0.5.1"
 [[bench]]
 name = "my_benchmark"
 harness = false
+

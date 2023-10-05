@@ -2,9 +2,12 @@
 #[allow(dead_code)]
 #[allow(unused_imports)]
 
-extern crate blas_src;
-//extern crate blas;
-//extern crate openblas_src;
+extern crate intel_mkl_src;
+// old comments from cargo.toml
+//# ndarray 0.15.0
+//# blas-src 0.8
+//# ndarray-linalg 0.14
+//# blas-src = { version = "0.4.0", features = ["intel-mkl"] }
 
 use ndarray::{
     array, 
