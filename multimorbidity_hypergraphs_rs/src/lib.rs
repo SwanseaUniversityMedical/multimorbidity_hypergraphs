@@ -153,53 +153,6 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
 }
 
-/*
-fn adjacency_matrix_times_vector(
-    incidence_matrix: &ArrayView2<f32>,
-    weight: &[f32],
-    vector: &[f32],
-) -> Vec<f32> {
-
-    // Serial
-    if let [outer, inner] = &incidence_matrix.shape() {
-        
-        let mut weighted_incidence: Array2<f32> = Array::zeros((*outer, *inner));
-        for i in 0..*outer * *inner {
-                weighted_incidence[[i / inner, i % inner]] += incidence_matrix[[i / inner, i % inner]] * weight[i / inner];
-        }
-        
-        let mut intermediate = vec![0.0; *outer];
-
-        for i in 0..*outer * *inner {
-            intermediate[i / inner] += weighted_incidence[[i / inner, i % inner]] * vector[i % inner];
-        }        
-        
-        let mut term_1 = vec![0.0; vector.len()];
-
-        
-        for i in 0..*outer * *inner {
-            term_1[i % inner] += incidence_matrix[[i / inner, i % inner]] * intermediate[i / inner];
-        }
-        
-        let mut subt = vec![0.0; vector.len()];
-    
-        for k in 0..*outer * *inner {
-                subt[k % inner] += incidence_matrix[[k / inner, k % inner]] * weighted_incidence[[k / inner, k % inner]] * vector[k % inner];
-        }
-        
-        let mut result = vec![0.0; vector.len()];
-
-        for i in 0..vector.len() {
-            result[i] = term_1[i] - subt[i];
-        }
-        
-        return result;
-        
-    } else {
-        panic!("The incidence matrix has the wrong shape.");
-    }
-}
-*/
 
 fn adjacency_matrix_times_vector(
     incidence_matrix: &ArrayView2<f32>,
@@ -242,78 +195,6 @@ fn adjacency_matrix_times_vector(
     }
 }
 
-
-/*
-fn adjacency_matrix_times_vector(
-    incidence_matrix: &ArrayView2<f32>,
-    weight: &[f32],
-    vector: &[f32],
-) -> Vec<f32> {
-
-    // Manual pool
-    if let [outer, inner] = &incidence_matrix.shape() {
-        
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(4)
-            .build()
-            .unwrap();
-    
-    
-        let weighted_incidence: Array2<f32> = pool.install( ||
-                Array::from_shape_vec((*outer, *inner), 
-                    (0..outer*inner)
-                        .into_par_iter()
-                        .map(|i| incidence_matrix[[i / inner, i % inner]] * weight[i / inner])
-                        .collect()
-                ).unwrap()
-            );
-            
-            
-        let intermediate  = pool.install( ||
-            Array::from_shape_vec((*outer, *inner), 
-                (0..outer * inner)
-                    .into_par_iter()
-                    .map(|i| weighted_incidence[[i / inner, i % inner]] * vector[i % inner])
-                    .collect()
-                ).unwrap()
-                .sum_axis(Axis(1))
-        );
-
-            
-        let term_1 = pool.install( ||
-            Array::from_shape_vec((*outer, *inner), 
-                (0..outer * inner)
-                    .into_par_iter()
-                    .map(|i| incidence_matrix[[i / inner, i % inner]] * intermediate[i / inner])
-                    .collect()
-                ).unwrap()
-                .sum_axis(Axis(0))
-        );
-                
-
-        let subt = pool.install( ||
-            Array::from_shape_vec((*outer, *inner), 
-                (0..outer * inner)
-                    .into_par_iter()
-                    .map(|i| incidence_matrix[[i / inner, i % inner]] * weighted_incidence[[i / inner, i % inner]] * vector[i % inner])
-                    .collect()
-                ).unwrap()
-                .sum_axis(Axis(0))
-        );
-            
-        pool.install( ||
-            (0..vector.len())
-                .into_par_iter()
-                .map(|i| term_1[i] - subt[i])
-                .collect()
-        )
-        
-    } else {
-        panic!("The incidence matrix has the wrong shape.");
-    }
-}
-
-*/
 
 
 fn evc_iteration(
