@@ -273,67 +273,64 @@ fn normalised_vector_init(len: usize) -> Vec<f32> {
     vector.iter().map(|&b| b / norm).collect()
 }
 
-impl Hypergraph {
-    pub fn eigenvector_centrality(
-        &self, 
-        max_iterations: u32,
-        tolerance: f32,
-        rep: Representation,
-    ) -> Vec<f32> {
-        
-        
-        let tmp_inc_mat = &self.incidence_matrix;
-        let im_dims = tmp_inc_mat.shape();
+pub fn eigenvector_centrality(
+    h: &Hypergraph, 
+    max_iterations: u32,
+    tolerance: f32,
+    rep: Representation,
+) -> Vec<f32> {
+    
+    
+    let tmp_inc_mat = &h.incidence_matrix;
+    let im_dims = tmp_inc_mat.shape();
 
+    
+    
+    let (eigenvector, inc_mat, weights) = match rep {
         
-        
-        let (eigenvector, inc_mat, weights) = match rep {
+        Representation::Standard => (
+            normalised_vector_init(im_dims[1]),
             
-            Representation::Standard => (
-                normalised_vector_init(im_dims[1]),
-                
-                self.incidence_matrix
-                    .mapv(|x| f32::from(x))
-                    .dot(&Array::from_diag(&arr1(
-                        &self.node_weights
-                            .iter()
-                            .map(|x| x.sqrt())
-                            .collect::<Vec<_>>()
-                        )
+            h.incidence_matrix
+                .mapv(|x| f32::from(x))
+                .dot(&Array::from_diag(&arr1(
+                    &h.node_weights
+                        .iter()
+                        .map(|x| x.sqrt())
+                        .collect::<Vec<_>>()
                     )
-                ),
-                
-                &self.edge_weights,
+                )
             ),
             
-            Representation::Dual => (
-                normalised_vector_init(im_dims[0]),
-                
-                self.incidence_matrix.t()
-                    .mapv(|x| f32::from(x))
-                    .dot(&Array::from_diag(&arr1(
-                        &self.edge_weights
-                            .iter()
-                            .map(|x| x.sqrt())
-                            .collect::<Vec<_>>()
-                        )
+            &h.edge_weights,
+        ),
+        
+        Representation::Dual => (
+            normalised_vector_init(im_dims[0]),
+            
+            h.incidence_matrix.t()
+                .mapv(|x| f32::from(x))
+                .dot(&Array::from_diag(&arr1(
+                    &h.edge_weights
+                        .iter()
+                        .map(|x| x.sqrt())
+                        .collect::<Vec<_>>()
                     )
-                ),
-                
-                &self.node_weights,
+                )
             ),
-        };
-    
-        evc_iteration(
-            inc_mat.view(),
-            weights,
-            eigenvector,
-            tolerance,
-            0,
-            max_iterations,
-        )
-    }
-    
+            
+            &h.node_weights,
+        ),
+    };
+
+    evc_iteration(
+        inc_mat.view(),
+        &weights,
+        eigenvector,
+        tolerance,
+        0,
+        max_iterations,
+    )
 }
 
 
@@ -819,7 +816,8 @@ mod tests {
         let tol = 0.00001;
         let max_iterations = 50;
         
-        let centrality = h.eigenvector_centrality(
+        let centrality = eigenvector_centrality(
+            &h,
             max_iterations, 
             tol, 
             Representation::Standard
@@ -902,7 +900,8 @@ mod tests {
         let tol = 0.00001;
         let max_iterations = 50;
         
-        let res = h.eigenvector_centrality(
+        let res = eigenvector_centrality(
+            &h,
             max_iterations, 
             tol,
             Representation::Standard
@@ -981,7 +980,8 @@ mod tests {
         let tol = 0.00001;
         let max_iterations = 50;
         
-        let res = h.eigenvector_centrality(
+        let res = eigenvector_centrality(
+            &h,
             max_iterations, 
             tol,
             Representation::Dual,

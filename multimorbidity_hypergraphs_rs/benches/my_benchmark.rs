@@ -83,7 +83,7 @@ fn criterion_benchmark_eigenvector_centrality_b(c: &mut Criterion) {
     let h = compute_hypergraph(&data);
     c.bench_function(
         "eigenvector_centrality_100k_10", 
-        |b| b.iter(|| h.eigenvector_centrality(100, 1e-6, Representation::Standard))
+        |b| b.iter(|| eigenvector_centrality(&h, 100, 1e-6, Representation::Standard))
     );
 }
 
@@ -165,7 +165,7 @@ fn criterion_benchmark_eigenvector_centrality_b1(c: &mut Criterion) {
     let h = compute_hypergraph(&data);
     c.bench_function(
         "eigenvector_centrality_100k_11", 
-        |b| b.iter(|| h.eigenvector_centrality(100, 1e-6, Representation::Standard))
+        |b| b.iter(|| eigenvector_centrality(&h, 100, 1e-6, Representation::Standard))
     );
 }
 fn criterion_benchmark_eigenvector_centrality_b2(c: &mut Criterion) {
@@ -184,7 +184,7 @@ fn criterion_benchmark_eigenvector_centrality_b2(c: &mut Criterion) {
     let h = compute_hypergraph(&data);
     c.bench_function(
         "eigenvector_centrality_100k_12", 
-        |b| b.iter(|| h.eigenvector_centrality(100, 1e-6, Representation::Standard))
+        |b| b.iter(|| eigenvector_centrality(&h, 100, 1e-6, Representation::Standard))
     );
 }
 
@@ -204,7 +204,7 @@ fn criterion_benchmark_eigenvector_centrality_b3(c: &mut Criterion) {
     let h = compute_hypergraph(&data);
     c.bench_function(
         "eigenvector_centrality_100k_13", 
-        |b| b.iter(|| h.eigenvector_centrality(100, 1e-6, Representation::Standard))
+        |b| b.iter(|| eigenvector_centrality(&h, 100, 1e-6, Representation::Standard))
     );
 }
 
@@ -224,7 +224,7 @@ fn criterion_benchmark_eigenvector_centrality_b4(c: &mut Criterion) {
     let h = compute_hypergraph(&data);
     c.bench_function(
         "eigenvector_centrality_100k_14", 
-        |b| b.iter(|| h.eigenvector_centrality(100, 1e-6, Representation::Standard))
+        |b| b.iter(|| eigenvector_centrality(&h, 100, 1e-6, Representation::Standard))
     );
 }
 fn criterion_benchmark_eigenvector_centrality_b5(c: &mut Criterion) {
@@ -243,7 +243,7 @@ fn criterion_benchmark_eigenvector_centrality_b5(c: &mut Criterion) {
     let h = compute_hypergraph(&data);
     c.bench_function(
         "eigenvector_centrality_100k_15", 
-        |b| b.iter(|| h.eigenvector_centrality(100, 1e-6, Representation::Standard))
+        |b| b.iter(|| eigenvector_centrality(&h, 100, 1e-6, Representation::Standard))
     );
 }
 
