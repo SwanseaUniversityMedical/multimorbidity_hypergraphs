@@ -251,6 +251,7 @@ fn evc_iteration(
 pub enum Representation {
     Standard,
     Dual,
+    Bipartite,
 }
 
 #[derive(Debug)]
@@ -320,6 +321,13 @@ pub fn eigenvector_centrality(
             ),
             
             &h.node_weights,
+        ),
+        
+        Representation::Bipartite => (
+            // the bipartite representation needs to be handled 
+            // separately with an implementation using sparse matrices
+        
+            return vec![0.0]
         ),
     };
 
@@ -1004,6 +1012,84 @@ mod tests {
             .map(|(x, y)| (x - y))
             .collect::<Vec<_>>()
         );
+        
+        assert!(rms_error < tol);
+   }
+   
+   #[test]
+   fn eigenvector_centrality_bipartite_rep_t () {
+       
+        let h = Hypergraph {
+            incidence_matrix: array![[0, 1, 0, 1],
+                 [1, 1, 0, 0],
+                 [1, 0, 1, 1],
+                 [0, 0, 1, 1],
+                 [1, 1, 0, 1],
+                 [0, 1, 1, 0],
+                 [1, 0, 0, 1],
+                 [1, 1, 1, 1],
+                 [0, 1, 1, 1],
+                 [1, 1, 1, 0],
+                 [1, 0, 1, 0]],
+            edge_weights: vec![0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+            node_weights: vec![0.4, 0.8, 0.6, 0.6],
+            edge_list: vec![vec![1, 3], vec![0, 1], vec![0, 2, 3], vec![2, 3], vec![0, 1, 3], vec![1, 2], vec![0, 3], vec![0, 1, 2, 3], vec![1, 2, 3], vec![0, 1, 2], vec![0, 2]],
+            node_list: vec![0, 1, 2, 3],
+        };
+        
+        let adjacency_matrix: Array2<f32> = array![[0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.5, 0.0, 0.5, 0.5, 0.0, 0.5, 0.5],
+            [0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.5, 0.5, 0.0, 0.5, 0.5, 0.5, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 0.5],
+            [0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 0.0, 0.5, 0.5, 0.5, 0.0, 0.0],
+            [0.0, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]];
+        
+        let (eig_vals, eig_vecs) = adjacency_matrix.eig().unwrap();
+        
+        let max_val = eig_vals
+            .mapv(|x| x.re)
+            .into_iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        
+        let max_index = eig_vals
+            .mapv(|x| x.re)
+            .iter()
+            .position(|x| *x == max_val)
+            .unwrap();
+        
+        let expected = eig_vecs
+            .index_axis(Axis(1), max_index)
+            .iter().map(|x| x.re.abs())
+            .collect::<Vec<_>>();
+           
+        let tol = 0.00001;
+        let res = eigenvector_centrality(
+            &h,
+            50, 
+            tol,
+            Representation::Bipartite,
+        );    
+
+        println!("{:?}", expected);
+        //println!("{:?}", expected.iter().sum::<f32>());
+        println!("{:?}", res);  
+
+        let rms_error = expected.iter()
+            .zip(&res)
+            .map(|(x, y)| (x - y).powf(2.0))
+            .sum::<f32>()
+            .sqrt() / expected.len() as f32;        
+            
         
         assert!(rms_error < tol);
    }
