@@ -10,17 +10,14 @@ extern crate intel_mkl_src;
 //# blas-src = { version = "0.4.0", features = ["intel-mkl"] }
 
 use ndarray::{
-    array, 
-    s, 
     Array,
-    Array1,
     Array2,
     ArrayView1, 
     ArrayView2, 
     Axis,
     arr1
 };
-use sprs::{CsMat, CsVec};
+use sprs::{CsMat, TriMat};
 use rand::Rng;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -274,6 +271,78 @@ fn normalised_vector_init(len: usize) -> Vec<f32> {
     vector.iter().map(|&b| b / norm).collect()
 }
 
+fn bipartite_eigenvector_centrality(
+    incidence_matrix: &Array2<u8>, 
+    edge_weights: &Vec<f32>,
+) -> Vec<f32> {
+    
+    let m_size = incidence_matrix.shape();
+    let n_edges = m_size[0]; let n_nodes = m_size[1];
+    
+    let total_elems: usize = n_edges + n_nodes;
+
+    let weighted_inc = incidence_matrix
+        .mapv(|x| f32::from(x))
+        .t()
+        .dot(&Array2::from_diag(&arr1(edge_weights)));
+
+    let rows: Vec<_> = weighted_inc
+        .indexed_iter()
+        .filter(|&(_, &value)| value != 0.0)
+        .map(|((row, _), _)| row)
+        .collect();
+    let cols: Vec<_> = weighted_inc
+        .indexed_iter()
+        .filter(|&(_, &value)| value != 0.0)
+        .map(|((_, col), _)| col)
+        .collect();
+    let data: Vec<_> = weighted_inc
+        .iter()
+        .filter(|&&value| value != 0.0)
+        .cloned()
+        .collect();
+    
+    let adjacency_matrix: CsMat<_> = {
+        let mut a = TriMat::new((total_elems, total_elems));
+        
+        for (i, (x, y)) in rows.into_iter().zip(&cols).enumerate() {
+            a.add_triplet(x, n_nodes + y, data[i]);
+            a.add_triplet(n_nodes + y, x, data[i]);
+        }
+        a.to_csr()
+    };
+
+    // NOTE(jim): At the moment, sprs doesn't support a lot of linear algebra
+    // operations and eig is one of them. We're going to use the iterative method
+    // to find the eigenvector, but at some point in the future we will probably 
+    // use an accelerated method.
+    // Also note, this matrix really does need to be sparse because it's potentially
+    // millions square but most entries are zero.
+    
+    // TODO(jim) Write the recursive function 
+
+    /*
+    println!("{:?}", adjacency_matrix);
+    
+    for i in 0..total_elems {
+        for j in 0..total_elems {
+            let inds = adjacency_matrix.nnz_index(i, j);
+            
+            match inds {
+                None => print!("0 "),
+                Some(x) => print!("v ", ), //adjacency_matrix[x]
+            }
+            
+            //print!("{:?} ", inds);
+        }
+        print!("\n",);
+    }
+    */
+
+
+    vec![0.0]
+}
+
 pub fn eigenvector_centrality(
     h: &Hypergraph, 
     max_iterations: u32,
@@ -323,11 +392,11 @@ pub fn eigenvector_centrality(
             &h.node_weights,
         ),
         
-        Representation::Bipartite => (
-            // the bipartite representation needs to be handled 
-            // separately with an implementation using sparse matrices
-        
-            return vec![0.0]
+        // the bipartite representation needs to be handled 
+        // separately with an implementation using sparse matrices
+        Representation::Bipartite => return bipartite_eigenvector_centrality(
+            &h.incidence_matrix,
+            &h.edge_weights
         ),
     };
 
@@ -347,6 +416,10 @@ pub fn eigenvector_centrality(
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use ndarray::{
+        array, 
+        s,
+    };
     use ndarray_rand::RandomExt;
     use ndarray_rand::rand_distr::Uniform;
     use ndarray_linalg::Eig;
