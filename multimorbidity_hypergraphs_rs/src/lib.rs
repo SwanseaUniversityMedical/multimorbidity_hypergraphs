@@ -16,8 +16,7 @@ use ndarray::{
     ArrayView1, 
     ArrayView2, 
     Axis,
-    arr1, 
-    s
+    arr1
 };
 use sprs::{CsMat, TriMat};
 use rand::Rng;
@@ -244,82 +243,27 @@ fn evc_iteration(
     }   
 }
 
-/*
-
-Note, the power iteration algorithm does not converge for the 
-bipartite adjacency matrix because the eigenvalues form +/- pairs, and 
-the convergence of the algorithm depends on the ratio |lambda_1| / |lambda_2|
-which here is = 1.
-
-There are lots of algorithms that calculate eigenvectors, but they are
-either super complicated to implement or they require calculating a matrix 
-inverse, which is going to be problematic for sprs.
-
-The Rayleigh quotient method does work for thie problem. Python implementation
-using numpy:
-
-import numpy as np 
-
-def rayleigh_quotient_iterate(A, num_iterations, tol=1e-6):
-    
-    # initial eigenvalue estimate 
-    mu = 5.0 
-    
-    # inital random eigenvector 
-    n_rows = A.shape[1]
-    b_k = np.random.rand(n_rows)
-    b_k = b_k / np.linalg.norm(b_k)
-    
-    for _ in range(num_iterations):
-        
-        # calculate eigenvector estimate 
-        mat_inv = np.linalg.inv(A - np.eye(n_rows) * mu)
-        b_k_new = mat_inv.dot(b_k) / np.linalg.norm(mat_inv)
-        
-        # calculate eigenvalue estimate 
-        mu_new = b_k_new.dot(A).dot(b_k_new) / np.linalg.norm(b_k_new) ** 2
-        
-        err = np.linalg.norm(b_k_new - b_k)
-        print(mu_new, err)
-        
-        mu = mu_new
-        b_k = b_k_new 
-        
-        if err < tol:
-            break
-        
-    return b_k / np.linalg.norm(b_k_new)
-
-
-
-adj_mat = np.array([[0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0],
-[0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0],
-[0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0],
-[1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-[0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-[1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-[1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]])
-
-
-calculated = rayleigh_quotient_iterate(adj_mat, 10)
-
-eigvals, eigvecs = np.linalg.eig(adj_mat)
-expected = eigvecs[:, np.argmax(eigvals)]
-print(expected / np.linalg.norm(expected))
-print(calculated)
-
-*/
 
 fn evc_iteration_sparse(
-    adj_mat: &Array2<f32>,//&CsMat<f32>,
+    adj_mat: &CsMat<f32>,
     eigenvector: &Array1<f32>,
     tolerance: f32,
     iter_no: u32,
     max_iterations: u32,
 ) -> Array1<f32> {
     
-    //let mut eigenvector_new = adj_mat * eigenvector;
-    let mut eigenvector_new = adj_mat.dot(eigenvector);
+    // NOTE(jim): The power iteration method for the bipartite rep
+    // is a terrible choice because the adjacency matrix is almost always
+    // singular. That means the non-zero eigenvalues form real +/- pairs 
+    // and the algorithm fails to converge. To get around that I am adding a 
+    // small positive offset to all entries in the adjacency matrix, but 
+    // that means I'm not strictly calculating the EVC of the adjacency matrix
+    // any more, and the tests fail. Moreover, because the offset is small the 
+    // convergence is really slow. On the bright side, the result is a pretty close 
+    // approximation to the correct answer.
+    
+    let offset = eigenvector.sum() * 0.01;    
+    let mut eigenvector_new = adj_mat * eigenvector + offset;
 
     let evnew_norm = eigenvector_new
         .iter()
@@ -339,8 +283,7 @@ fn evc_iteration_sparse(
         .sum::<f32>()
         .sqrt();
 
-    //println!("{} {}", iter_no, err_estimate);
-    println!("{:?}", err_estimate);
+    
 
     if (err_estimate < tolerance) | (iter_no > max_iterations) {
         eigenvector_new 
@@ -424,7 +367,7 @@ fn bipartite_eigenvector_centrality(
         .cloned()
         .collect();
     
-    /*
+    
     let adjacency_matrix: CsMat<_> = {
         let mut a = TriMat::new((total_elems, total_elems));
         
@@ -434,31 +377,19 @@ fn bipartite_eigenvector_centrality(
         }
         a.to_csr()
     };
-    */
-    
-    let mut adjacency_matrix: Array2<f32> = Array::zeros((total_elems, total_elems));
-    adjacency_matrix.slice_mut(s!(n_nodes..total_elems, 0..n_nodes)).assign(&incidence_matrix.mapv(|x| f32::from(x)));
-    adjacency_matrix.slice_mut(s!(0..n_nodes, n_nodes..total_elems)).assign(&incidence_matrix.mapv(|x| f32::from(x)).t());
     
     
     let eigenvector = Array::from_vec(
         normalised_vector_init(total_elems)
     );
-    /*
-    for i in 0..total_elems {
-        for j in 0..total_elems {
-            let inds = adjacency_matrix.nnz_index(i, j);
-            
-            match inds {
-                None => print!("0 "),
-                Some(x) => print!("v ", ), //adjacency_matrix[x]
-            }
-            
-            //print!("{:?} ", inds);
-        }
-        print!("\n",);
-    }    
-    */
+    
+    
+    // NOTE(jim): At the moment, sprs doesn't support a lot of linear algebra
+    // operations and eig is one of them. We're going to use the iterative method
+    // to find the eigenvector, but at some point in the future we will probably 
+    // use an accelerated method.
+    // Also note, this matrix really does need to be sparse because it's potentially
+    // millions square but most entries are zero.
     
     evc_iteration_sparse(
         &adjacency_matrix,
@@ -469,35 +400,7 @@ fn bipartite_eigenvector_centrality(
     )
     
 
-    // NOTE(jim): At the moment, sprs doesn't support a lot of linear algebra
-    // operations and eig is one of them. We're going to use the iterative method
-    // to find the eigenvector, but at some point in the future we will probably 
-    // use an accelerated method.
-    // Also note, this matrix really does need to be sparse because it's potentially
-    // millions square but most entries are zero.
-    
-    // TODO(jim) Write the recursive function 
 
-    /*
-    println!("{:?}", adjacency_matrix);
-    
-    for i in 0..total_elems {
-        for j in 0..total_elems {
-            let inds = adjacency_matrix.nnz_index(i, j);
-            
-            match inds {
-                None => print!("0 "),
-                Some(x) => print!("v ", ), //adjacency_matrix[x]
-            }
-            
-            //print!("{:?} ", inds);
-        }
-        print!("\n",);
-    }
-    */
-
-
-    //vec![0.0]
 }
 
 pub fn eigenvector_centrality(
@@ -1247,7 +1150,7 @@ mod tests {
         
         assert!(rms_error < tol);
    }
-   /*
+   
    #[test]
    fn eigenvector_centrality_bipartite_rep_t () {
        
@@ -1315,8 +1218,6 @@ mod tests {
             .map(|x| x / ex_norm)
             .collect::<Vec<_>>();             
            
-        //println!("{:?}", adjacency_matrix);
-           
         let tol = 0.00001;
         let res = eigenvector_centrality(
             &h,
@@ -1327,24 +1228,24 @@ mod tests {
 
         println!("\nTest printlns");
         println!("{:?}", expected);
-        //println!("{:?}", expected.iter().sum::<f32>());
         println!("{:?}", res);  
 
         let rms_error = expected.iter()
             .zip(&res)
             .map(|(x, y)| (x - y).powf(2.0))
             .sum::<f32>()
-            .sqrt() / expected.len() as f32;        
+            .sqrt() / expected.len() as f32;  
             
+        println!("RMS error = {}", rms_error);            
         
         assert!(rms_error < tol);
    }
-   */
+   
    #[test]
    fn eigenvector_centrality_bipartite_rep_rand_t () {
        
-        let n_diseases = 3;
-        let n_subjects = 15;
+        let n_diseases = 4;
+        let n_subjects = 50;
         
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
@@ -1354,15 +1255,20 @@ mod tests {
         let n_edges = m_size[0]; let n_nodes = m_size[1];
         let total_elems: usize = n_edges + n_nodes;
         
+        let weighted_inc = h.incidence_matrix
+            .mapv(|x| f32::from(x))
+            .t()
+            .dot(&Array2::from_diag(&arr1(&h.edge_weights)));
+        
         let mut adjacency_matrix: Array2<f32> = Array::zeros((total_elems, total_elems));
         adjacency_matrix
             .slice_mut(s!(n_nodes..total_elems, 0..n_nodes))
-            .assign(&h.incidence_matrix.mapv(|x| f32::from(x)));
+            .assign(&weighted_inc.t());
         adjacency_matrix
             .slice_mut(s!(0..n_nodes, n_nodes..total_elems))
-            .assign(&h.incidence_matrix.mapv(|x| f32::from(x)).t());
+            .assign(&weighted_inc);
             
-        println!("{:?}", adjacency_matrix);
+        println!("{:?}", adjacency_matrix.shape());
         
         let (eig_vals, eig_vecs) = adjacency_matrix.eig().unwrap();
         
@@ -1394,19 +1300,15 @@ mod tests {
             .map(|x| x / ex_norm)
             .collect::<Vec<_>>();             
            
-        //println!("{:?}", adjacency_matrix);
-           
         let tol = 0.00001;
         let res = eigenvector_centrality(
             &h,
-            50, 
+            200, 
             tol,
             Representation::Bipartite,
         );    
 
-        println!("\nTest printlns");
         println!("{:?}", expected);
-        //println!("{:?}", expected.iter().sum::<f32>());
         println!("{:?}", res);  
 
         let rms_error = expected.iter()
@@ -1415,6 +1317,7 @@ mod tests {
             .sum::<f32>()
             .sqrt() / expected.len() as f32;        
             
+        println!("RMS error = {}", rms_error);
         
         assert!(rms_error < tol);
    }   
