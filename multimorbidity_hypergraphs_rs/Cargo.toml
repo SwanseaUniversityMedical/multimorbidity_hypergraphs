@@ -23,6 +23,7 @@ ndarray = { version = "0.15", features = ["blas"] }
 ndarray-linalg = { version = "0.16", features = ["intel-mkl-static"] }
 ndarray-rand = "0.14.0"
 sprs = "0.11.1"
+log = "0.4"
 
 [dev-dependencies]
 criterion = "0.5.1"

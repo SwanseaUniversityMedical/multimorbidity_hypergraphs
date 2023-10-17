@@ -23,6 +23,7 @@ use rand::Rng;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashSet;
+use log::warn;
 
 pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
     
@@ -262,6 +263,9 @@ fn evc_iteration_sparse(
     // convergence is really slow. On the bright side, the result is a pretty close 
     // approximation to the correct answer.
     
+    // BiCGSTAB is currently being worked on by the sprs developers, so hopefully 
+    // I will be able to make use of that soon...
+    
     let offset = eigenvector.sum() * 0.01;    
     let mut eigenvector_new = adj_mat * eigenvector + offset;
 
@@ -340,6 +344,11 @@ fn bipartite_eigenvector_centrality(
     tolerance: f32,
     max_iterations: u32,
 ) -> Array1<f32> {
+    
+    warn!("WARNING: This currently calculates the eigenvector centrality of the adjacency matrix
+    plus a small offset. This is because of limitations in the external libraries used. The 
+    eigenvector centralities returned are not exactly correct, though the ordering of the 
+    centralities should be correct. Do not rely on this if it's mission critical.");
     
     let m_size = incidence_matrix.shape();
     let n_edges = m_size[0]; let n_nodes = m_size[1];
@@ -1227,8 +1236,8 @@ mod tests {
         );    
 
         println!("\nTest printlns");
-        println!("{:?}", expected);
-        println!("{:?}", res);  
+        println!("Expected: {:?}", expected);
+        println!("Calculated: {:?}", res);  
 
         let rms_error = expected.iter()
             .zip(&res)
@@ -1308,8 +1317,8 @@ mod tests {
             Representation::Bipartite,
         );    
 
-        println!("{:?}", expected);
-        println!("{:?}", res);  
+        println!("Expected: {:?}", expected);
+        println!("Calculated: {:?}", res);  
 
         let rms_error = expected.iter()
             .zip(&res)
