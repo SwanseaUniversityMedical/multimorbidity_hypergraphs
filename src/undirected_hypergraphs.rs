@@ -9,6 +9,8 @@ extern crate intel_mkl_src;
 //# ndarray-linalg 0.14
 //# blas-src = { version = "0.4.0", features = ["intel-mkl"] }
 
+use crate::types::*;
+
 // TODO -clean up the datatypes
 use ndarray::{
     Array,
@@ -303,21 +305,6 @@ fn evc_iteration_sparse(
     }   
 }
 
-
-pub enum Representation {
-    Standard,
-    Dual,
-    Bipartite,
-}
-
-#[derive(Debug)]
-pub struct Hypergraph {
-    incidence_matrix: Array2<u8>, 
-    edge_weights: Vec<f32>,
-    node_weights: Vec<f32>,
-    edge_list: Vec<Vec<usize>>, 
-    node_list: Vec<usize>, 
-}
 
 fn normalised_vector_init(len: usize) -> Vec<f32> {
     
