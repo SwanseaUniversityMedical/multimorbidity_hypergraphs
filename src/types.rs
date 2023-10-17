@@ -9,7 +9,7 @@ pub enum Representation {
 }
 
 #[derive(Debug)]
-pub struct Hypergraph {
+pub struct HypergraphBase {
     pub incidence_matrix: Array2<u8>, 
     pub edge_weights: Vec<f32>,
     pub node_weights: Vec<f32>,

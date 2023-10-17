@@ -28,7 +28,7 @@ use rayon::prelude::*;
 use std::collections::HashSet;
 use log::warn;
 
-pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
+pub fn compute_hypergraph(data: &Array2<u8>) -> HypergraphBase {
     
     // Computes the hypergraph from an array of data.
     
@@ -43,7 +43,7 @@ pub fn compute_hypergraph(data: &Array2<u8>) -> Hypergraph {
     
     println!("{} {} {}", &edge_list.len(), &node_list.len(), &edge_list.len()*&node_list.len());
     
-    Hypergraph {
+    HypergraphBase {
         incidence_matrix: inc_mat, 
         edge_weights: compute_edge_weights(&data, &edge_list),
         node_weights: node_w,
@@ -401,7 +401,7 @@ fn bipartite_eigenvector_centrality(
 }
 
 pub fn eigenvector_centrality(
-    h: &Hypergraph, 
+    h: &HypergraphBase, 
     max_iterations: u32,
     tolerance: f32,
     rep: Representation,
@@ -893,7 +893,7 @@ mod tests {
         // test the computation of the eigenvector centrality
         // NOTE(jim): Only calculating the weighted resultant: sqrt(w_n) * M^T * w_e * M * sqrt(w_n)
         
-        let h = Hypergraph {
+        let h = HypergraphBase {
             incidence_matrix: array![[0, 1, 0, 1],
                  [1, 1, 0, 0],
                  [1, 0, 1, 1],
@@ -1151,7 +1151,7 @@ mod tests {
    #[test]
    fn eigenvector_centrality_bipartite_rep_t () {
        
-        let h = Hypergraph {
+        let h = HypergraphBase {
             incidence_matrix: array![[0, 1, 0, 1],
                  [1, 1, 0, 0],
                  [1, 0, 1, 1],

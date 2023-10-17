@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use multimorbidity_hypergraphs::undirected_hypergraphs::*;
+use multimorbidity_hypergraphs::types::*;
 use ndarray::prelude::*;
 use rand::Rng;
 
