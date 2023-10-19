@@ -27,6 +27,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use log::warn;
+use std::cmp;
 
 pub fn compute_hypergraph(data: &Array2<u8>) -> HypergraphBase {
     
@@ -41,7 +42,7 @@ pub fn compute_hypergraph(data: &Array2<u8>) -> HypergraphBase {
         .map(|x| overlap_coefficient(data.select(Axis(1), [*x].as_slice()).view()))
         .collect::<Vec<_>>();
     
-    println!("{} {} {}", &edge_list.len(), &node_list.len(), &edge_list.len()*&node_list.len());
+    //println!("{} {} {}", &edge_list.len(), &node_list.len(), &edge_list.len()*&node_list.len());
     
     HypergraphBase {
         incidence_matrix: inc_mat, 
@@ -93,7 +94,8 @@ fn overlap_coefficient(data: ArrayView2<u8>) -> f64 {
         1 => {
             data
                 .iter()
-                .sum::<u8>() as f64 / 
+                .map(|x| *x as u32)
+                .sum::<u32>() as f64 / 
             data.nrows() as f64
         }
     
@@ -101,7 +103,12 @@ fn overlap_coefficient(data: ArrayView2<u8>) -> f64 {
         _ => {
             let denom = data
                 .axis_iter(Axis(1))
-                .map(|x| x.sum())
+                .map(|x| 
+                    x
+                        .iter()
+                        .map(|y| *y as u32)
+                        .sum::<u32>()
+                )
                 .min()
                 .unwrap() as f64;
                 
@@ -122,13 +129,21 @@ fn overlap_coefficient(data: ArrayView2<u8>) -> f64 {
        
 }
 
-fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
+fn reduced_powerset(
+    data_row: ArrayView1<u8>,
+    all_diseases: usize,
+) -> HashSet<Vec<usize>> {
 
     // Returns the "reduced" powerset of a single set of diseases (ie the powerset
     // without the empty or singleton sets. 
     
+    let n_diseases = data_row.iter().map(|x| (x > &0) as usize).sum::<usize>();
+    
+
+    let upper_const = cmp::min(all_diseases - 1, n_diseases);
+    
     // -1 at the end of the statement in the line below excludes the set of all diseases
-    (2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>() - 1) 
+    (2..=upper_const) 
         .map(|ii| 
             data_row
             .iter()
@@ -146,9 +161,11 @@ fn construct_edge_list(data: &Array2<u8>) -> Vec<Vec<usize>> {
     
     // Constructs the full edge list from the original data array.
     
+    let all_diseases = data.ncols();
+    
     data
         .axis_iter(Axis(0))
-        .map(|x| reduced_powerset(x))
+        .map(|x| reduced_powerset(x, all_diseases))
         .flatten()
         .collect::<HashSet<_>>()
         .into_iter()
@@ -503,7 +520,7 @@ mod tests {
         expected.insert(vec![1,3]);
         
         assert_eq!(
-            reduced_powerset(data.row(3)),
+            reduced_powerset(data.row(3), 4),
             expected
         );
         
@@ -526,12 +543,12 @@ mod tests {
         expected.insert(vec![0,2]);
         
         assert_eq!(
-            reduced_powerset(data.row(0)),
+            reduced_powerset(data.row(0), 4),
             expected
         );
         
     }
-    
+
     #[test]
     fn reduced_powerset_emptyset_t() {
         // Tests the function to construct the reduced powerset for a person that has exactly 
@@ -548,7 +565,7 @@ mod tests {
         let expected = HashSet::new();
         
         assert_eq!(
-            reduced_powerset(data.row(1)),
+            reduced_powerset(data.row(1), 4),
             expected
         );
         
@@ -570,7 +587,7 @@ mod tests {
         
         let mut expected = Vec::new();
         
-        expected.push(vec![0,1,2,3]);
+        //expected.push(vec![0,1,2,3]);
         
         expected.push(vec![0,1,2]);
         expected.push(vec![0,1,3]);
@@ -677,7 +694,7 @@ mod tests {
         let expected = array![
             [1,1,0,0],
             [1,0,1,0],
-            [1,1,1,1],
+            //[1,1,1,1],
             [0,1,1,0],
             [1,1,0,1],
             [1,1,1,0],
@@ -700,7 +717,6 @@ mod tests {
             assert!(expected.axis_iter(Axis(0)).contains(&x));
             
         }
-        
         
     }
     
@@ -728,7 +744,7 @@ mod tests {
             (vec![0, 1, 3], 1./2.),
             (vec![0, 2, 3], 1./2.),
             (vec![1, 2, 3], 2./3.),
-            (vec![0, 1, 2, 3], 1./2.), // TODO(jim): decide if we need the "all diseases" edge.
+            //(vec![0, 1, 2, 3], 1./2.), 
         ]);
         
         let edge_list = construct_edge_list(&data);
@@ -766,6 +782,9 @@ mod tests {
         let edge_list = construct_edge_list(&data);
         let weights = compute_edge_weights(&data, &edge_list);
         
+        println!("{:?}", edge_list);
+        println!("{:?}", weights);
+        
         assert_eq!(
             weights.len(),
             expected.len()
@@ -774,6 +793,25 @@ mod tests {
         for (ii, edge) in edge_list.into_iter().enumerate() {
             assert_eq!(weights[ii], expected[&edge]);
         }
+     
+    }
+
+    #[test]
+    fn compute_edge_weights_big_t() {
+
+        // tests to make sure a bigish dataset runs at all.
+
+        let n_diseases = 10;
+        let n_subjects = 5000;
+        
+        let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
+            .mapv(|x| x as u8);
+        
+        let h = compute_hypergraph(&data);
+        
+        println!("{}", h.edge_weights.len());
+        
+        println!("Yay");
      
     }
     

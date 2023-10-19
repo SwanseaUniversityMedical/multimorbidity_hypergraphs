@@ -1,7 +1,7 @@
 
 
-mod types;
-mod undirected_hypergraphs;
+pub mod types;
+pub mod undirected_hypergraphs;
 
 use ndarray::Array2;
 use numpy::{ToPyArray, PyArray2};

@@ -4,10 +4,10 @@ use multimorbidity_hypergraphs::types::*;
 use ndarray::prelude::*;
 use rand::Rng;
 
-/*
+
 fn build_hypergraph(data: &Array2<u8>) {
 
-    let h = compute_hypergraph(&data);
+    let _h = compute_hypergraph(&data);
     
 }
 
@@ -27,6 +27,7 @@ fn criterion_benchmark_build_hypergraph(c: &mut Criterion) {
     c.bench_function("build_hypergraph_5k_10", |b| b.iter(|| build_hypergraph(&data)));
 }
 
+/*
 fn criterion_benchmark_eigenvector_centrality(c: &mut Criterion) {
     
     let n_patients = 5000;
@@ -253,7 +254,7 @@ fn criterion_benchmark_eigenvector_centrality_b5(c: &mut Criterion) {
 
 criterion_group!(
     benches, 
-    //criterion_benchmark_build_hypergraph, 
+    criterion_benchmark_build_hypergraph, 
     //criterion_benchmark_eigenvector_centrality,
     //criterion_benchmark_eigenvector_centrality_dual,
     criterion_benchmark_eigenvector_centrality_b,
