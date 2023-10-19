@@ -3,11 +3,6 @@
 #[allow(unused_imports)]
 
 extern crate intel_mkl_src;
-// old comments from cargo.toml
-//# ndarray 0.15.0
-//# blas-src 0.8
-//# ndarray-linalg 0.14
-//# blas-src = { version = "0.4.0", features = ["intel-mkl"] }
 
 use crate::types::*;
 
@@ -138,11 +133,8 @@ fn reduced_powerset(
     // without the empty or singleton sets. 
     
     let n_diseases = data_row.iter().map(|x| (x > &0) as usize).sum::<usize>();
-    
-
     let upper_const = cmp::min(all_diseases - 1, n_diseases);
     
-    // -1 at the end of the statement in the line below excludes the set of all diseases
     (2..=upper_const) 
         .map(|ii| 
             data_row
@@ -335,11 +327,6 @@ fn normalised_vector_init(len: usize) -> Vec<f64> {
         .iter()
         .fold(0., |sum, &num| sum + num.powf(2.0))
         .sqrt();
-    //let norm = vector
-    //    .iter()
-    //    .map(|x| x.powf(2.0))
-    //    .sum::<f64>()
-    //    .sqrt();
         
     vector.iter().map(|&b| b / norm).collect()
 }
@@ -429,8 +416,6 @@ pub fn eigenvector_centrality(
     let tmp_inc_mat = &h.incidence_matrix;
     let im_dims = tmp_inc_mat.shape();
 
-    
-    
     let (eigenvector, inc_mat, weights) = match rep {
         
         Representation::Standard => (
@@ -488,7 +473,6 @@ pub fn eigenvector_centrality(
 }
 
 
-// Idiomatic rust is apparently to have tests and code in the same file
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -694,7 +678,6 @@ mod tests {
         let expected = array![
             [1,1,0,0],
             [1,0,1,0],
-            //[1,1,1,1],
             [0,1,1,0],
             [1,1,0,1],
             [1,1,1,0],
@@ -744,7 +727,6 @@ mod tests {
             (vec![0, 1, 3], 1./2.),
             (vec![0, 2, 3], 1./2.),
             (vec![1, 2, 3], 2./3.),
-            //(vec![0, 1, 2, 3], 1./2.), 
         ]);
         
         let edge_list = construct_edge_list(&data);
@@ -773,8 +755,7 @@ mod tests {
             [0, 1, 1]
         ]; // there is no one with disease 0 and disease 1
 
-        let expected = HashMap::from([     
-            //(vec![0, 1], 0.0),
+        let expected = HashMap::from([
             (vec![0, 2], 1./1.),
             (vec![1, 2], 2./3.),
         ]);
@@ -1021,12 +1002,6 @@ mod tests {
         
         assert!(rms_error < tol);
     }
-    
-    // TODO - Tests needed
-    // 1 - eigenvector centrality with a random initial dataset - DONE
-    // 2 - eigenvector centrality of the dual representation - DONE
-    // 3 - eigenvector centrality of the bipartite representation
-    // 4 - POSSIBLY: a single pass through the recursive function evc_iteration
     
     #[test]
     fn eigenvector_centrality_t () {
