@@ -127,7 +127,8 @@ fn reduced_powerset(data_row: ArrayView1<u8>) -> HashSet<Vec<usize>> {
     // Returns the "reduced" powerset of a single set of diseases (ie the powerset
     // without the empty or singleton sets. 
     
-    (2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>())
+    // -1 at the end of the statement in the line below excludes the set of all diseases
+    (2..=data_row.iter().map(|x| (x > &0) as usize).sum::<usize>() - 1) 
         .map(|ii| 
             data_row
             .iter()
