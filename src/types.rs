@@ -11,8 +11,8 @@ pub enum Representation {
 #[derive(Debug)]
 pub struct HypergraphBase {
     pub incidence_matrix: Array2<u8>, 
-    pub edge_weights: Vec<f32>,
-    pub node_weights: Vec<f32>,
+    pub edge_weights: Vec<f64>,
+    pub node_weights: Vec<f64>,
     pub edge_list: Vec<Vec<usize>>, 
     pub node_list: Vec<usize>, 
 }

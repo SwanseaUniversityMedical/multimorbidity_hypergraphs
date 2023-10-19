@@ -35,9 +35,9 @@ pub struct Hypergraph{
     #[pyo3(get, set)]
     pub incidence_matrix: Py<PyArray2<u8>>, 
     #[pyo3(get, set)]
-    pub edge_weights: Vec<f32>,
+    pub edge_weights: Vec<f64>,
     #[pyo3(get, set)]
-    pub node_weights: Vec<f32>,
+    pub node_weights: Vec<f64>,
     #[pyo3(get, set)]
     pub edge_list: Vec<PyObject>, 
     #[pyo3(get, set)]
