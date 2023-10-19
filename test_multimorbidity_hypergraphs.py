@@ -7,6 +7,8 @@ import numba
 import statsmodels.stats.proportion as smsp
 import scipy.stats as sst
 
+import polars as pl
+
 def test_instantiated():
     """
     Tests the instantiation of the hypergraph object.
@@ -53,11 +55,11 @@ def test_build_hypergraph_edge_weights():
         ('disease_1', 'disease_2', 'disease_3'): 2/3,
     }
 
-    data_pd = pd.DataFrame(
-        data
-    ).rename(
-        columns={i: "disease_{}".format(i) for i in range(data.shape[1])}
+    data_pd = pl.DataFrame(
+        data,
+        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
     )
+    
     h = hgt.Hypergraph()
     h.compute_hypergraph(data_pd)
 
