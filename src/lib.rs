@@ -12,6 +12,7 @@ use pyo3::types::PyTuple;
 
 
 use undirected_hypergraphs::*;
+use types::*; 
 
 /*
 fn print_type_of<T>(_: &T) {
@@ -41,7 +42,11 @@ pub struct Hypergraph{
     #[pyo3(get, set)]
     pub edge_list: Vec<PyObject>, 
     #[pyo3(get, set)]
-    pub node_list: Vec<String>, 
+    pub node_list: Vec<String>,
+}
+
+trait ToRust<T> {
+    fn to_rust(&self) -> T;
 }
 
 #[pymethods]
@@ -124,6 +129,40 @@ impl Hypergraph {
     }
 }
 
+impl ToRust<HypergraphBase> for Hypergraph {
+    fn to_rust(&self) -> HypergraphBase {
+        
+        Python::with_gil(|py|
+            HypergraphBase{
+                incidence_matrix: self.incidence_matrix
+                    .as_ref(py)
+                    .to_owned_array(), 
+                edge_weights: self.edge_weights.clone(),
+                node_weights: self.node_weights.clone(),
+                edge_list: self.edge_list
+                    .iter()
+                    .map(|edge|
+                        edge 
+                            .as_ref(py)
+                            .downcast::<PyTuple>()
+                            .unwrap()
+                            .iter()
+                            .map(|node| 
+                                self.node_list
+                                    .iter()
+                                    .position(|node_str| 
+                                        *node_str == node.extract::<String>().unwrap()
+                                    )
+                                    .unwrap()
+                            )
+                            .collect::<Vec<usize>>()
+                    )
+                    .collect::<Vec<_>>(), 
+                node_list: (0..self.node_list.len()).collect::<Vec<usize>>(), 
+            }
+        )
+    }
+}
 
 #[pymodule]
 pub fn multimorbidity_hypergraphs(_py: Python, m: &PyModule) -> PyResult<()> {
