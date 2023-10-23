@@ -127,6 +127,61 @@ impl Hypergraph {
                 .collect::<Vec<String>>();  
         });
     }
+    
+    fn eigenvector_centrality(
+        &self,
+        rep: Option<String>,
+        weighted_resultant: Option<bool>,
+        tolerance: Option<f64>,
+        max_iterations: Option<u32>, 
+    ) -> Vec<f64> {
+        
+        let representation = match rep {
+            Some(str_x) => {
+                match str_x.as_ref() {
+                    "standard" => Representation::Standard,
+                    "dual" => Representation::Dual,
+                    "bipartite" => Representation::Bipartite,
+                    _ => panic!("Error: Requested representation not recognised.")
+                }
+            }
+            None => Representation::Standard
+        };
+        
+        // TODO - sigh...
+        let _wr = match weighted_resultant {
+            Some(x) => x,
+            None => true,
+        };
+        
+        let tol = match tolerance {
+            Some(x) => x,
+            None => 1e-6,
+        };
+        
+        
+        let iterations = match max_iterations {
+            Some(x) => x,
+            None => 100,
+        };
+        
+        eigenvector_centrality(
+            &self.to_rust(),
+            iterations,
+            tol,
+            representation,
+        )
+        
+    }
+    
+    /*
+    pub fn eigenvector_centrality(
+    h: &HypergraphBase, 
+    max_iterations: u32,
+    tolerance: f64,
+    rep: Representation,
+)
+    */
 }
 
 impl ToRust<HypergraphBase> for Hypergraph {
