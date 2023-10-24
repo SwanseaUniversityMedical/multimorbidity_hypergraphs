@@ -149,7 +149,7 @@ impl Hypergraph {
         };
         
         // TODO - sigh...
-        let _wr = match weighted_resultant {
+        let wr = match weighted_resultant {
             Some(x) => x,
             None => true,
         };
@@ -170,6 +170,7 @@ impl Hypergraph {
             iterations,
             tol,
             representation,
+            wr
         )
         
     }
