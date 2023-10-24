@@ -9,6 +9,7 @@ use numpy::{ToPyArray, PyArray2};
 use pyo3::prelude::*;
 use pyo3::{PyAny, PyResult};
 use pyo3::types::PyTuple;
+use pyo3::exceptions::PyException;
 
 
 use undirected_hypergraphs::*;
@@ -134,7 +135,7 @@ impl Hypergraph {
         weighted_resultant: Option<bool>,
         tolerance: Option<f64>,
         max_iterations: Option<u32>, 
-    ) -> Vec<f64> {
+    ) -> PyResult<Vec<f64>> {
         
         let representation = match rep {
             Some(str_x) => {
@@ -142,13 +143,16 @@ impl Hypergraph {
                     "standard" => Representation::Standard,
                     "dual" => Representation::Dual,
                     "bipartite" => Representation::Bipartite,
-                    _ => panic!("Error: Requested representation not recognised.")
+                    _ => return Err(
+                        PyException::new_err(
+                            "Error: Requested representation not recognised."
+                        )
+                    )
                 }
             }
             None => Representation::Standard
         };
         
-        // TODO - sigh...
         let wr = match weighted_resultant {
             Some(x) => x,
             None => true,
@@ -159,20 +163,20 @@ impl Hypergraph {
             None => 1e-6,
         };
         
-        
         let iterations = match max_iterations {
             Some(x) => x,
             None => 100,
         };
         
-        eigenvector_centrality(
-            &self.to_rust(),
-            iterations,
-            tol,
-            representation,
-            wr
+        Ok(
+            eigenvector_centrality(
+                &self.to_rust(),
+                iterations,
+                tol,
+                representation,
+                wr
+            )
         )
-        
     }
     
     /*

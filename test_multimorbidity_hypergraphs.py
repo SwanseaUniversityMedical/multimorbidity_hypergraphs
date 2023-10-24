@@ -291,7 +291,7 @@ def test_calculate_EVC_standard_hypergraph():
         )
     )
     np.fill_diagonal(adjacency_matrix, 0.0)
-    np_e_vals, np_e_vecs = np.linalg.eigh(adjacency_matrix)
+    np_e_vals, np_e_vecs = np.linalg.eig(adjacency_matrix)
 
     exp_eval = np.max(np_e_vals)
     exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
@@ -307,6 +307,10 @@ def test_calculate_EVC_standard_hypergraph():
 
     # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
     e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+    
+    print(exp_evec)
+    print(e_vec)
+    print(exp_evec - e_vec)
 
     # there is some numerical uncertainty in these calculations
     assert (np.abs(exp_evec - e_vec) < tolerance).all()

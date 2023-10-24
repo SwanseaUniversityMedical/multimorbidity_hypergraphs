@@ -241,7 +241,6 @@ fn evc_iteration(
         .map(|(&x, &y)| (x - y).powf(2.0))
         .sum::<f64>()
         .sqrt();
-    
   
     if (err_estimate < tolerance) | (iter_no > max_iterations) {
         eigenvector_new 
@@ -1115,8 +1114,9 @@ mod tests {
         
         let big_mess = h.incidence_matrix.mapv(|x| f64::from(x)).t()
             .dot(&Array::from_diag(&arr1(&h.edge_weights)))
-            .dot(&h.incidence_matrix.mapv(|x| f64::from(x)));        
+            .dot(&h.incidence_matrix.mapv(|x| f64::from(x)));
         let adj = &big_mess -  Array::from_diag(&big_mess.diag());
+
         let (eig_vals, eig_vecs) = adj.eig().unwrap();
         
         let max_val = eig_vals
