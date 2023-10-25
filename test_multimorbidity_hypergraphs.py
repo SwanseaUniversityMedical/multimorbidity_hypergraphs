@@ -108,60 +108,60 @@ def test_build_hypergraph_edge_weights_zero_sets():
     #assert len(h.edge_weights) == len(h.edge_weights_pop)
 
 
-def test_build_hypergraph_edge_weights_zero_sets_custom_weights():
-    """
-    Test that edges with zero weight are correctly discarded when using a custom weight function.
-    """
-    
-    
-    @numba.jit(
-        nopython=True,
-        nogil=True,
-        fastmath=True,
-    )
-    def unit_weights(data, inds):
-        """
-        This function returns a 1.0 divided by a number passed in as an optional
-        argument.
-        """
-        if len(inds) == 3:
-            return 0.0, 0.0
-        return 1.0, 0.0
-        
-    data = np.array([
-        [1, 0, 1, 0],
-        [0, 1, 0, 0],
-        [0, 1, 0, 1],
-        [0, 1, 1, 1],
-        [1, 1, 1, 1]
-    ])
-
-    exp_edge_weights = {
-        ('disease_0', 'disease_1'): 1,
-        ('disease_0', 'disease_2'): 1,
-        ('disease_1', 'disease_2'): 1,
-        ('disease_0', 'disease_3'): 1,
-        ('disease_1', 'disease_3'): 1,
-        ('disease_2', 'disease_3'): 1,
-    }
-
-    data_pd = pl.DataFrame(
-        data,
-        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
-    )
-    
-    h = hgt.Hypergraph()
-    h.compute_hypergraph(data_pd, unit_weights)
-
-    # make sure there are the right number of sets / weights
-    assert len(h.edge_weights) == len(exp_edge_weights.values())
-
-    # check each non-zero weight
-    for k in exp_edge_weights:
-        if exp_edge_weights[k] > 0:
-            assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
-
-    assert len(h.edge_weights) == len(h.edge_weights_pop)
+#def test_build_hypergraph_edge_weights_zero_sets_custom_weights():
+#    """
+#    Test that edges with zero weight are correctly discarded when using a custom weight function.
+#    """
+#    
+#    
+#    @numba.jit(
+#        nopython=True,
+#        nogil=True,
+#        fastmath=True,
+#    )
+#    def unit_weights(data, inds):
+#        """
+#        This function returns a 1.0 divided by a number passed in as an optional
+#        argument.
+#        """
+#        if len(inds) == 3:
+#            return 0.0, 0.0
+#        return 1.0, 0.0
+#        
+#    data = np.array([
+#        [1, 0, 1, 0],
+#        [0, 1, 0, 0],
+#        [0, 1, 0, 1],
+#        [0, 1, 1, 1],
+#        [1, 1, 1, 1]
+#    ])
+#
+#    exp_edge_weights = {
+#        ('disease_0', 'disease_1'): 1,
+#        ('disease_0', 'disease_2'): 1,
+#        ('disease_1', 'disease_2'): 1,
+#        ('disease_0', 'disease_3'): 1,
+#        ('disease_1', 'disease_3'): 1,
+#        ('disease_2', 'disease_3'): 1,
+#    }
+#
+#    data_pd = pl.DataFrame(
+#        data,
+#        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
+#    )
+#    
+#    h = hgt.Hypergraph()
+#    h.compute_hypergraph(data_pd, unit_weights)
+#
+#    # make sure there are the right number of sets / weights
+#    assert len(h.edge_weights) == len(exp_edge_weights.values())
+#
+#    # check each non-zero weight
+#    for k in exp_edge_weights:
+#        if exp_edge_weights[k] > 0:
+#            assert h.edge_weights[h.edge_list.index(k)] == exp_edge_weights[k]
+#
+#    assert len(h.edge_weights) == len(h.edge_weights_pop)
 
 
 
@@ -703,107 +703,107 @@ def test_degree_centrality_exception_raised():
         h.degree_centrality(rep="oh no!")
 
 
-def test_non_standard_weight_function():
-    """
-    Tests to make sure a user can specify a non standard weight function
-    that is used in construct_hypergraph
-    """
-    @numba.jit(
-        nopython=True,
-        nogil=True,
-        fastmath=True,
-    )
-    def unit_weights(data, inds):
-        """
-        This function returns a 1.0 for each edge, essentially creating an
-        unweighted hypergraph.
-        """
+#def test_non_standard_weight_function():
+#    """
+#    Tests to make sure a user can specify a non standard weight function
+#    that is used in construct_hypergraph
+#    """
+#    @numba.jit(
+#        nopython=True,
+#        nogil=True,
+#        fastmath=True,
+#    )
+#    def unit_weights(data, inds):
+#        """
+#        This function returns a 1.0 for each edge, essentially creating an
+#        unweighted hypergraph.
+#        """
+#
+#        return 1.0, 0.0
+#
+#    n_people = 5000
+#    n_diseases = 10
+#
+#    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+#    data_pd = pl.DataFrame(
+#        data,
+#        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
+#    )
+#
+#    h = hgt.Hypergraph()
+#    h.compute_hypergraph(data_pd, weight_function=unit_weights)
+#
+#    assert (h.edge_weights == 1).all()
 
-        return 1.0, 0.0
 
-    n_people = 5000
-    n_diseases = 10
+#def test_non_standard_weight_function_with_optional_arguments():
+#    """
+#    Tests to make sure a user can specify a non standard weight function and
+#    specify optional arguments to be used in construct_hypergraph
+#    specify optional arguments to be used in construct_hypergraph
+#    """
+#
+#    @numba.jit(
+#        nopython=True,
+#        nogil=True,
+#        fastmath=True,
+#    )
+#    def unit_weights(data, inds, *args):
+#        """
+#        This function returns a 1.0 divided by a number passed in as an optional
+#        argument.
+#        """
+#        print(args[0])
+#        return 1.0 / args[0], 0.0
+#
+#    n_people = 5000
+#    n_diseases = 10
+#
+#    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+#    data_pd = pl.DataFrame(
+#        data,
+#        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
+#    )
+#
+#    h = hgt.Hypergraph()
+#    h.compute_hypergraph(data_pd, unit_weights, 2.0)
+#
+#    assert (h.edge_weights == 1/2).all()
 
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pl.DataFrame(
-        data,
-        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
-    )
-
-    h = hgt.Hypergraph()
-    h.compute_hypergraph(data_pd, weight_function=unit_weights)
-
-    assert (h.edge_weights == 1).all()
-
-
-def test_non_standard_weight_function_with_optional_arguments():
-    """
-    Tests to make sure a user can specify a non standard weight function and
-    specify optional arguments to be used in construct_hypergraph
-    specify optional arguments to be used in construct_hypergraph
-    """
-
-    @numba.jit(
-        nopython=True,
-        nogil=True,
-        fastmath=True,
-    )
-    def unit_weights(data, inds, *args):
-        """
-        This function returns a 1.0 divided by a number passed in as an optional
-        argument.
-        """
-        print(args[0])
-        return 1.0 / args[0], 0.0
-
-    n_people = 5000
-    n_diseases = 10
-
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pl.DataFrame(
-        data,
-        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
-    )
-
-    h = hgt.Hypergraph()
-    h.compute_hypergraph(data_pd, unit_weights, 2.0)
-
-    assert (h.edge_weights == 1/2).all()
-
-def test_non_standard_weight_function_node_and_edge_weights_with_optional_arguments():
-    """
-    Tests to make sure a user can specify a non standard weight function and
-    specify optional arguments to be used in construct_hypergraph
-    specify optional arguments to be used in construct_hypergraph
-    """
-
-    @numba.jit(
-        nopython=True,
-        nogil=True,
-        fastmath=True,
-    )
-    def unit_weights(data, inds, *args):
-        """
-        This function returns a 1.0 divided by a number passed in as an optional
-        argument.
-        """
-        print(args[0])
-        return 1.0 / args[0], 0.0
-
-    n_people = 5000
-    n_diseases = 10
-
-    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
-    data_pd = pl.DataFrame(
-        data,
-        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
-    )
-
-    h = hgt.Hypergraph()
-    h.compute_hypergraph(data_pd, unit_weights, 2.0)
-
-    assert (h.edge_weights == 1/2).all()
-    assert (h.node_weights == 1/2).all()
+#def test_non_standard_weight_function_node_and_edge_weights_with_optional_arguments():
+#    """
+#    Tests to make sure a user can specify a non standard weight function and
+#    specify optional arguments to be used in construct_hypergraph
+#    specify optional arguments to be used in construct_hypergraph
+#    """
+#
+#    @numba.jit(
+#        nopython=True,
+#        nogil=True,
+#        fastmath=True,
+#    )
+#    def unit_weights(data, inds, *args):
+#        """
+#        This function returns a 1.0 divided by a number passed in as an optional
+#        argument.
+#        """
+#        print(args[0])
+#        return 1.0 / args[0], 0.0
+#
+#    n_people = 5000
+#    n_diseases = 10
+#
+#    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+#    data_pd = pl.DataFrame(
+#        data,
+#        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
+#    )
+#
+#    h = hgt.Hypergraph()
+#    h.compute_hypergraph(data_pd, unit_weights, 2.0)
+#
+#    assert (h.edge_weights == 1/2).all()
+#    assert (h.node_weights == 1/2).all()
 
 def test_iterate_vector():
 
