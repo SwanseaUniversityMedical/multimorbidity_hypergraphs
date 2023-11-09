@@ -412,7 +412,6 @@ pub fn eigenvector_centrality(
     weighted_resultant: bool,
 ) -> Vec<f64> {
     
-    
     let tmp_inc_mat = &h.incidence_matrix;
     let im_dims = tmp_inc_mat.shape();
 
@@ -1165,6 +1164,98 @@ mod tests {
         
         assert!(rms_error < tol);
     }
+    
+    
+   #[test]
+   fn eigenvector_centrality_dual_rep_not_wr_not_rand_t() {
+        let data = array![[0, 1, 0, 0, 0, 0],
+            [1, 1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 0, 1],
+            [0, 0, 0, 1, 1, 0],
+            [0, 1, 1, 1, 0, 1],
+            [1, 1, 1, 1, 1, 0],
+            [1, 1, 0, 1, 0, 1],
+            [1, 0, 1, 0, 0, 1],
+            [0, 0, 0, 0, 1, 1],
+            [1, 0, 1, 0, 0, 1],
+            [1, 0, 1, 0, 0, 0],
+            [1, 1, 1, 1, 0, 1],
+            [0, 0, 1, 1, 1, 0],
+            [0, 0, 1, 0, 1, 0],
+            [1, 0, 0, 1, 1, 0],
+            [0, 1, 0, 1, 0, 0],
+            [1, 1, 1, 0, 0, 1],
+            [0, 1, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 0],
+            [1, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 1],
+            [0, 0, 0, 0, 1, 1],
+            [0, 1, 1, 1, 0, 0],
+            [1, 1, 0, 1, 1, 0],
+            [0, 1, 0, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 0],
+            [0, 0, 1, 1, 0, 1],
+            [0, 1, 0, 1, 1, 0],
+            [0, 0, 1, 1, 1, 0]];
+           
+        let h = compute_hypergraph(&data);
+        
+        let big_mess = h.incidence_matrix.mapv(|x| f64::from(x)).t()
+            .dot(&Array::from_diag(&arr1(&h.edge_weights)))
+            .dot(&h.incidence_matrix.mapv(|x| f64::from(x)));
+        let adj = &big_mess -  Array::from_diag(&big_mess.diag());
+
+        let (eig_vals, eig_vecs) = adj.eig().unwrap();
+        
+        let max_val = eig_vals
+            .mapv(|x| x.re)
+            .into_iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        
+        let max_index = eig_vals
+            .mapv(|x| x.re)
+            .iter()
+            .position(|x| *x == max_val)
+            .unwrap();
+        
+        let expected = eig_vecs
+            .index_axis(Axis(1), max_index)
+            .iter().map(|x| x.re.abs())
+            .collect::<Vec<_>>();        
+        let tol = 0.00001;
+        let max_iterations = 50;
+        
+        let res = eigenvector_centrality(
+            &h,
+            max_iterations, 
+            tol,
+            Representation::Standard,
+            false
+        );
+        
+        
+        println!("Rust, Expected: {:?}", expected);
+        println!("Rust, Result: {:?}", res);
+        
+        let rms_error = expected.iter()
+            .zip(&res)
+            .map(|(x, y)| (x - y).powf(2.0))
+            .sum::<f64>()
+            .sqrt() / expected.len() as f64;
+            
+        println!("{:?}", rms_error);
+        
+        println!("{:?}", expected.iter() 
+            .zip(res)
+            .map(|(x, y)| (x - y))
+            .collect::<Vec<_>>()
+        );
+        
+        assert!(rms_error < tol);        
+        assert!(false);
+   }
     
    #[test]
    fn eigenvector_centrality_dual_rep_t () {

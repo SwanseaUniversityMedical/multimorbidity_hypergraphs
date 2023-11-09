@@ -316,6 +316,87 @@ def test_calculate_EVC_standard_hypergraph():
     assert (np.abs(exp_evec - e_vec) < tolerance).all()
 
 
+def test_calculate_EVC_standard_hypergraph_not_rand():
+    """
+    Test that the eigenvector centrality of the standard hypergraph
+    (centrality of the nodes) is calculated correctly.
+    """
+
+    tolerance = 1e-6
+
+    data = np.array([[0, 1, 0, 0, 0, 0],
+            [1, 1, 1, 0, 0, 0],
+            [0, 0, 1, 1, 0, 1],
+            [0, 0, 0, 1, 1, 0],
+            [0, 1, 1, 1, 0, 1],
+            [1, 1, 1, 1, 1, 0],
+            [1, 1, 0, 1, 0, 1],
+            [1, 0, 1, 0, 0, 1],
+            [0, 0, 0, 0, 1, 1],
+            [1, 0, 1, 0, 0, 1],
+            [1, 0, 1, 0, 0, 0],
+            [1, 1, 1, 1, 0, 1],
+            [0, 0, 1, 1, 1, 0],
+            [0, 0, 1, 0, 1, 0],
+            [1, 0, 0, 1, 1, 0],
+            [0, 1, 0, 1, 0, 0],
+            [1, 1, 1, 0, 0, 1],
+            [0, 1, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 0],
+            [1, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 0, 1],
+            [0, 0, 0, 0, 1, 1],
+            [0, 1, 1, 1, 0, 0],
+            [1, 1, 0, 1, 1, 0],
+            [0, 1, 0, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0],
+            [0, 1, 0, 1, 1, 0],
+            [0, 0, 1, 1, 0, 1],
+            [0, 1, 0, 1, 1, 0],
+            [0, 0, 1, 1, 1, 0]])
+    data_pd = pl.DataFrame(
+        data,
+        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
+    )
+
+    # calculate the adjacency matrix from the incidence matrix and weights
+    # computed by h.compute_hypergraph() tested above.
+
+    h = hgt.Hypergraph()
+    h.compute_hypergraph(data_pd)
+
+    adjacency_matrix = np.dot(
+        h.incidence_matrix.T,
+        np.dot(
+            np.diag(h.edge_weights),
+            h.incidence_matrix
+        )
+    )
+    np.fill_diagonal(adjacency_matrix, 0.0)
+    np_e_vals, np_e_vecs = np.linalg.eig(adjacency_matrix)
+
+    exp_eval = np.max(np_e_vals)
+    exp_evec = np_e_vecs[:, exp_eval == np_e_vals].reshape(-1)
+    exp_evec = exp_evec / np.sqrt(np.dot(exp_evec, exp_evec))
+
+    # The expected eigenvector can sometimes be all negative elements, for
+    # what I assume are numerical reasons. They should always be either all
+    # positive or all negative (i.e. up to an overal scaling of -1).
+    assert (exp_evec > 0).all() | (exp_evec < 0).all()
+    exp_evec = np.abs(exp_evec)
+
+    e_vec = h.eigenvector_centrality(tolerance=tolerance)
+
+    # eigenvectors are defined up to a scaling, so normalise such that it is a unit vector.
+    e_vec = e_vec / np.sqrt(np.dot(e_vec, e_vec))
+    
+    print("Python, Expected: ", exp_evec)
+    print("Python, Result: ", e_vec)
+    print(exp_evec - e_vec)
+
+    # there is some numerical uncertainty in these calculations
+    assert (np.abs(exp_evec - e_vec) < tolerance).all()
+
 def test_weighted_resultant_EVC_standard_hypergraph():
     """
     Test that the eigenvector centrality of the standard hypergraph

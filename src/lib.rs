@@ -155,7 +155,7 @@ impl Hypergraph {
         
         let wr = match weighted_resultant {
             Some(x) => x,
-            None => true,
+            None => false,
         };
         
         let tol = match tolerance {
