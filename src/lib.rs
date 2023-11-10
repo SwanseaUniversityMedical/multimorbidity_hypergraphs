@@ -145,7 +145,7 @@ impl Hypergraph {
                     "bipartite" => Representation::Bipartite,
                     _ => return Err(
                         PyException::new_err(
-                            "Error: Requested representation not recognised."
+                            "Error: Requested representation not supported."
                         )
                     )
                 }
@@ -179,14 +179,41 @@ impl Hypergraph {
         )
     }
     
-    /*
-    pub fn eigenvector_centrality(
-    h: &HypergraphBase, 
-    max_iterations: u32,
-    tolerance: f64,
-    rep: Representation,
-)
-    */
+    
+    fn degree_centrality(
+        &self,
+        rep: Option<String>,
+        weighted: Option<bool>
+    ) -> PyResult<Vec<f64>> {
+    
+        let representation = match rep {
+            Some(str_x) => {
+                match str_x.as_ref() {
+                    "standard" => Representation::Standard,
+                    "dual" => Representation::Dual,
+                    _ => return Err(
+                        PyException::new_err(
+                            "Error: Requested representation not supported."
+                        )
+                    )
+                }
+            }
+            None => Representation::Standard
+        };
+        
+        let weight = match weighted {
+            Some(x) => x,
+            None => true
+        };
+        
+        Ok(
+            degree_centrality(
+                &self.to_rust(),
+                representation,
+                weight
+            )
+        )
+    }
 }
 
 impl ToRust<HypergraphBase> for Hypergraph {
