@@ -783,6 +783,26 @@ def test_degree_centrality_exception_raised():
     with pytest.raises(Exception):
         h.degree_centrality(rep="oh no!")
 
+
+def test_benchmarking_compute_hypergraph_5k_10(benchmark):
+
+    n_people = 5000
+    n_diseases = 10
+
+    data = (np.random.rand(n_people, n_diseases) > 0.8).astype(np.uint8)
+    data_pd = pl.DataFrame(
+        data,
+        schema=[("disease_{}".format(i), pl.UInt8) for i in range(data.shape[1])]
+    )
+
+    h = hgt.Hypergraph()
+
+    benchmark(
+        h.compute_hypergraph,
+        data_pd
+    )
+    
+    
 def test_benchmarking_eigenvector_centrality_100k_10(benchmark):
 
     n_people = 100000
