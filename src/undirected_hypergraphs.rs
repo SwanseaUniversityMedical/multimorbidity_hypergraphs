@@ -24,7 +24,7 @@ use std::collections::HashSet;
 use log::warn;
 use std::cmp;
 
-pub fn compute_hypergraph(data: &Array2<u8>) -> HypergraphBase {
+pub fn compute_undirected_hypergraph(data: &Array2<u8>) -> HypergraphBase {
     
     // Computes the hypergraph from an array of data.
     
@@ -855,7 +855,7 @@ mod tests {
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         println!("{}", h.edge_weights.len());
         
@@ -877,7 +877,7 @@ mod tests {
             [1, 1, 1, 1]
         ];
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         let expected = vec![2./5., 4./5., 3./5., 3./5.];
         
@@ -1080,7 +1080,7 @@ mod tests {
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         let big_mess = Array::from_diag(&arr1(&
                 h.node_weights
@@ -1159,7 +1159,7 @@ mod tests {
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         let big_mess = h.incidence_matrix.mapv(|x| f64::from(x)).t()
             .dot(&Array::from_diag(&arr1(&h.edge_weights)))
@@ -1249,7 +1249,7 @@ mod tests {
             [0, 1, 0, 1, 1, 0],
             [0, 0, 1, 1, 1, 0]];
            
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         let big_mess = h.incidence_matrix.mapv(|x| f64::from(x)).t()
             .dot(&Array::from_diag(&arr1(&h.edge_weights)))
@@ -1303,8 +1303,7 @@ mod tests {
             .collect::<Vec<_>>()
         );
         
-        assert!(rms_error < tol);        
-        assert!(false);
+        assert!(rms_error < tol);
    }
     
    #[test]
@@ -1316,7 +1315,7 @@ mod tests {
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         let big_mess = Array::from_diag(&arr1(&
                 h.edge_weights
@@ -1397,7 +1396,7 @@ mod tests {
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         let big_mess = h.incidence_matrix.mapv(|x| f64::from(x))
             .dot(&Array::from_diag(&arr1(&h.node_weights)))
@@ -1554,7 +1553,7 @@ mod tests {
         let data = Array::random((n_subjects, n_diseases), Uniform::new(0.5, 1.5))
             .mapv(|x| x as u8);
         
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         let m_size = h.incidence_matrix.shape();
         let n_edges = m_size[0]; let n_nodes = m_size[1];
         let total_elems: usize = n_edges + n_nodes;

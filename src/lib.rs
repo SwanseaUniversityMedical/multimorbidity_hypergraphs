@@ -62,7 +62,7 @@ impl Hypergraph {
                 // from this constructor. Until then we have C&P code... :(
                 
                 let (cols, data) = py_dataframe_to_rust_data(x).unwrap();
-                let h = compute_hypergraph(&data);
+                let h = compute_undirected_hypergraph(&data);
                 
                 Python::with_gil(|py| 
                     Hypergraph{
@@ -104,7 +104,7 @@ impl Hypergraph {
     ) {
         
         let (cols, data) = py_dataframe_to_rust_data(df).unwrap();
-        let h = compute_hypergraph(&data);
+        let h = compute_undirected_hypergraph(&data);
         
         
         Python::with_gil(|py| {
