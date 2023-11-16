@@ -1,7 +1,9 @@
 
 
 pub mod types;
+pub mod interest_measures;
 pub mod undirected_hypergraphs;
+pub mod directed_hypergraphs;
 
 use ndarray::Array2;
 use numpy::{ToPyArray, PyArray2};
