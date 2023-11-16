@@ -1,8 +1,14 @@
 
 use crate::types::*;
 
-use ndarray::Array2;
+use ndarray::{
+    Array1,
+    //Array2,
+    //ArrayView1,
+    s,
+};
 
+/*
 pub fn compute_directed_hypergraph(
     data: &Array2<i8>
 ) -> DiHypergraphBase {
@@ -10,6 +16,22 @@ pub fn compute_directed_hypergraph(
     DiHypergraphBase{incidence_matrix: Array2::zeros((1,1))}
     
 }
+*/
+
+fn compute_single_progset(data_ind: &Array1<i8>) -> Vec<Array1<i8>> {
+    
+    // NOTE - we are assuming that there are no duplicates in the ordering
+    // ie, this is the simplest possible progression. 
+    (1..data_ind.len())
+        .filter(|&i| data_ind[i] >= 0)
+        .map(|i| {
+            let mut i_vec = data_ind.slice(s![0..(i + 1)]).to_vec();
+            i_vec.extend(&vec![-1; data_ind.len() - 1 - i]);
+            Array1::from_vec(i_vec)
+        })
+        .collect()
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -17,6 +39,22 @@ mod tests {
     
     use ndarray::array;
     
+    
+    #[test]
+    fn di_compute_progression_set_t () {
+        
+        let data = array![2, 0, 1];
+        let expected = vec![
+            array![ 2,  0, -1],
+            array![ 2,  0,  1]
+        ];
+        
+        let out = compute_single_progset(&data);
+        
+        assert_eq!(out, expected);
+    }
+    
+    /*
     #[test]
     fn di_construct_dihypergraph() {
         
@@ -34,5 +72,5 @@ mod tests {
         let out = compute_directed_hypergraph(&data);
         assert!(false);   
     }
-    
+    */
 }
