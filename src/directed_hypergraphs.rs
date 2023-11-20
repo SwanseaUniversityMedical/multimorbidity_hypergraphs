@@ -3,8 +3,8 @@
 
 use ndarray::{
     Array1,
-    //Array2,
-    //ArrayView1,
+    Array2,
+    Axis,
     s,
 };
 use std::collections::HashSet;
@@ -18,6 +18,17 @@ pub fn compute_directed_hypergraph(
     
 }
 */
+
+fn compute_progset(data: &Array2<i8>) -> HashSet<Array1<i8>> {
+    
+    let n_rows = data.nrows();
+
+    (0..n_rows)
+        //.into_iter()
+        .flat_map(|i| compute_single_progset(&data.index_axis(Axis(0), i).to_owned()))
+        .collect()
+    
+}
 
 fn compute_single_progset(data_ind: &Array1<i8>) -> HashSet<Array1<i8>> {
     
@@ -77,7 +88,29 @@ mod tests {
         let out = compute_single_progset(&data);
         
         assert_eq!(out, expected);
-    }    
+    }
+    
+    #[test]
+    fn di_compute_progression_set_cohort_t() {
+        
+        let data = array![
+            [2, 0, 1],
+            [2, -1, -1],
+        ];
+        
+        let expected = HashSet::from([
+            array![ 2,  0, -1],
+            array![ 2,  0,  1],
+            array![2, -1 ,-1]
+        ]);
+        
+        
+        let out = compute_progset(&data);
+        
+        assert_eq!(out, expected);
+        
+    }
+    
     /*
     #[test]
     fn di_construct_dihypergraph() {
