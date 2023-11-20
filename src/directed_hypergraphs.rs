@@ -24,18 +24,8 @@ fn compute_incidence_matrix(data: &HashSet<Array1<i8>>) -> Array2<i8> {
     
     let data_vec: Vec<_> = data.into_iter().collect();
     
-    let n_arcs = data_vec.len();
+    //let n_arcs = data_vec.len();
     let n_diseases = data_vec[0].len();
-
-    //let data_array: Array2<_> = data.into_iter().collect();
-    let mut data_array = Array2::<i8>::default((n_arcs, n_diseases));
-    for (i, mut row) in data_array.axis_iter_mut(Axis(0)).enumerate() {
-        for (j, col) in row.iter_mut().enumerate() {
-            *col = data_vec[i][j];
-        }
-    }
-    println!("{:?}", data_array);
-    
     
     let mut hyperedges: HashSet<Array1<i8>> = HashSet::new();
     
@@ -214,11 +204,16 @@ mod tests {
         let ps = compute_progset(&data);
         let out = compute_incidence_matrix(&ps);
         
-        // NOTE - I think this is working, but the order of the edges 
-        // is arbitrary so the test fails (because of the hashset). 
-        // TODO - figure out how to test this meaningfully. is there an ndarray
-        // sort_rows method or something?
-        assert_eq!(out, expected);
+        // NOTE - the order of axes does not matter, so use an iterator over
+        // rows and collect them into a HashSet for comparison.
+        assert_eq!(
+            out
+                .axis_iter(Axis(0))
+                .collect::<HashSet<_>>(), 
+            expected
+                .axis_iter(Axis(0))
+                .collect::<HashSet<_>>()
+        );
         
     }
     
