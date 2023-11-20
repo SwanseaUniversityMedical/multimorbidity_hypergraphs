@@ -2,6 +2,7 @@
 //use crate::types::*;
 
 use ndarray::{
+    Array,
     Array1,
     Array2,
     Axis,
@@ -18,6 +19,55 @@ pub fn compute_directed_hypergraph(
     
 }
 */
+
+fn compute_incidence_matrix(data: &HashSet<Array1<i8>>) -> Array2<i8> {
+    
+    let data_vec: Vec<_> = data.into_iter().collect();
+    
+    let n_arcs = data_vec.len();
+    let n_diseases = data_vec[0].len();
+
+    //let data_array: Array2<_> = data.into_iter().collect();
+    let mut data_array = Array2::<i8>::default((n_arcs, n_diseases));
+    for (i, mut row) in data_array.axis_iter_mut(Axis(0)).enumerate() {
+        for (j, col) in row.iter_mut().enumerate() {
+            *col = data_vec[i][j];
+        }
+    }
+    println!("{:?}", data_array);
+    
+    
+    let mut hyperedges: HashSet<Array1<i8>> = HashSet::new();
+    
+    for a in data_vec.iter() {
+        
+        let mut edge = Array::zeros(n_diseases);
+        
+        let n_conds = a
+            .iter()
+            .map(|&x| x >= 0)
+            .filter(|&x| x)
+            .count();
+        
+        for j in 0..n_conds-1 {
+            edge[[a[j] as usize]] = -1;
+        }
+        edge[[a[n_conds-1] as usize]] = 1;
+
+        println!("{:?}, {:?}", a.to_vec(), edge.to_vec());
+        hyperedges.insert(edge);
+    }
+    
+    let n_edges = hyperedges.len();
+    hyperedges
+        .into_iter()
+        .flat_map(|x| x)
+        .collect::<Array1<_>>()
+        .into_shape((n_edges, n_diseases))
+        .unwrap()
+       
+        
+}
 
 fn compute_progset(data: &Array2<i8>) -> HashSet<Array1<i8>> {
     
@@ -37,7 +87,7 @@ fn compute_single_progset(data_ind: &Array1<i8>) -> HashSet<Array1<i8>> {
     
     let n_diseases = data_ind
         .iter()
-        .map(|&x| x > 0)
+        .map(|&x| x >= 0)
         .filter(|&x| x)
         .count();
     
@@ -133,7 +183,44 @@ mod tests {
         
         assert_eq!(out, expected);
         
-    }    
+    }
+    
+    #[test]
+    fn di_compute_incidence_matrix_t() {
+        
+        let data = array![
+            [ 0,  1,  2,],
+            [ 0,  1,  2,],
+            [ 0,  1,  2,],
+            [ 2,  0,  1,],
+            [ 1,  2, -1,],
+            //[ 0, -1, -1,],
+            //[ 2, -1, -1,],
+            [ 1,  0,  2,],
+            [ 0,  1, -1,],
+            [ 0,  2, -1,],
+        ];
+        
+        let expected = array![
+            [-1,  1,  0],
+            [-1, -1,  1],
+            [ 1,  0, -1],
+            [-1,  1, -1],
+            [ 0, -1,  1],
+            [ 1, -1,  0],
+            [-1,  0,  1]
+        ];
+        
+        let ps = compute_progset(&data);
+        let out = compute_incidence_matrix(&ps);
+        
+        // NOTE - I think this is working, but the order of the edges 
+        // is arbitrary so the test fails (because of the hashset). 
+        // TODO - figure out how to test this meaningfully. is there an ndarray
+        // sort_rows method or something?
+        assert_eq!(out, expected);
+        
+    }
     
     /*
     #[test]
