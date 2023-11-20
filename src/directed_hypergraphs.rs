@@ -111,6 +111,30 @@ mod tests {
         
     }
     
+    
+    #[test]
+    fn di_compute_progression_set_cohort_duplicates_t() {
+        
+        let data = array![
+            [2, 0, 1],
+            [2, 0, 1],
+            [2, 0, 1],
+            [2, 0, 1],
+            [2, 0, 1],
+        ];
+        
+        let expected = HashSet::from([
+            array![ 2,  0, -1],
+            array![ 2,  0,  1],
+        ]);
+        
+        
+        let out = compute_progset(&data);
+        
+        assert_eq!(out, expected);
+        
+    }    
+    
     /*
     #[test]
     fn di_construct_dihypergraph() {
