@@ -10,7 +10,8 @@ use ndarray::{
     Axis,
     s,
 };
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet, HashMap}; // maybe use an indexset instead of a hashset here?
+use itertools::izip;
 
 /*
 pub fn compute_directed_hypergraph(
@@ -71,14 +72,37 @@ fn compute_prev_matrices(
 }
 */
 
-fn compute_progset(data: &Array2<i8>) -> HashSet<Array1<i8>> {
+fn compute_progset(data: &Array2<i8>) -> 
+(
+    HashSet<Array1<i8>>,
+    Array1<f64>,
+    Array2<f64>,
+) {
     
     let n_rows = data.nrows();
+    let n_diseases = data.ncols();
+    let max_hyperedges = 2_usize.pow(n_diseases as u32);
 
-    (0..n_rows)
+    let mut hyperarc_prev: Array2<f64>  = Array::zeros((max_hyperedges, n_diseases));
+    let mut hyperedge_prev: Array1<f64> = Array::zeros(max_hyperedges);
+
+    let out = (0..n_rows)
         //.into_iter()
-        .flat_map(|i| compute_single_progset(&data.index_axis(Axis(0), i).to_owned()).0 )
-        .collect()
+        .flat_map(|i| {
+                let progset_data = compute_single_progset(&data.index_axis(Axis(0), i).to_owned());
+                for (a, b, c, z) in izip!(progset_data.1, progset_data.2, progset_data.3, progset_data.4) {
+                    println!("{} {} {}, {}", a, b, c, z);
+                    hyperedge_prev[c] += z;
+                    hyperarc_prev[[a, b as usize]] += z;
+                }
+                progset_data.0
+            }
+         )
+        .collect();
+    println!("{:?}", hyperedge_prev);
+    //println!("{:?}", hyperarc_prev);
+    
+    (out, hyperedge_prev, hyperarc_prev)
     
 }
 
@@ -113,7 +137,7 @@ fn compute_single_progset(
         // people that only have one disease have to be treated spearately
         1 => {
             (
-                HashSet::from([data_ind.clone()]),
+                HashSet::new(),//HashSet::from([data_ind.clone()]),
                 array![0],
                 array![data_ind[0]],
                 array![2_usize.pow(data_ind[0] as u32)],
@@ -137,6 +161,8 @@ fn compute_single_progset(
                     |arr| arr
                         .iter()
                         .filter(|&x| x >= &0)
+                        .rev()
+                        .skip(1)
                         .fold(0, |acc, x| acc + 2_usize.pow(*x as u32))
                 )
                 .collect();
@@ -176,6 +202,10 @@ fn compute_single_progset(
                 .iter()
                 .map(|x| 1.0 / (cond_cnt[x] as f64))
                 .collect();
+                
+            //println!("{:?}", data_ind.to_vec());
+            //println!("{:?}", out);
+            //println!("{:?} {:?} {:?}", bin_tail.to_vec(), head_node.to_vec(), bin_headtail.to_vec());
             
             (    
                 out, // single prog_set
@@ -212,8 +242,6 @@ mod tests {
         let out = compute_single_progset(&data);
         
         assert_eq!(out.0, expected);
-        
-        //assert!(false);
     }
     
     
@@ -221,13 +249,11 @@ mod tests {
     fn di_compute_progression_set_singleton_t () {
         
         let data = array![2, -1, -1];
-        let expected: HashSet<Array1<i8>> = HashSet::from([array![2, -1 ,-1]]);
+        let expected: HashSet<Array1<i8>> = HashSet::new();
         
         let out = compute_single_progset(&data);
         
         assert_eq!(out.0, expected);
-        
-        //assert!(false);
     }
     
     #[test]
@@ -238,16 +264,29 @@ mod tests {
             [2, -1, -1],
         ];
         
-        let expected = HashSet::from([
+        let expected_progset = HashSet::from([
             array![ 2,  0, -1],
             array![ 2,  0,  1],
-            array![2, -1 ,-1]
+            //array![2, -1 ,-1] // progsets must have at least 2 diseases in them
         ]);
+        
+        let expected_hyperedge_prev = array![0., 0., 0., 0., 2., 1., 0., 1.];
+        
+        let expected_hyperarc_prev = array![[0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [0., 1., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.]];
         
         
         let out = compute_progset(&data);
         
-        assert_eq!(out, expected);
+        assert_eq!(out.0, expected_progset);
+        assert_eq!(out.1, expected_hyperedge_prev);
+        assert_eq!(out.2, expected_hyperarc_prev);
         
     }
     
@@ -271,7 +310,7 @@ mod tests {
         
         let out = compute_progset(&data);
         
-        assert_eq!(out, expected);
+        assert_eq!(out.0, expected);
         
     }
     
@@ -284,8 +323,8 @@ mod tests {
             [ 0,  1,  2,],
             [ 2,  0,  1,],
             [ 1,  2, -1,],
-            //[ 0, -1, -1,],
-            //[ 2, -1, -1,],
+            [ 0, -1, -1,],
+            [ 2, -1, -1,],
             [ 1,  0,  2,],
             [ 0,  1, -1,],
             [ 0,  2, -1,],
@@ -302,7 +341,7 @@ mod tests {
         ];
         
         let ps = compute_progset(&data);
-        let out = compute_incidence_matrix(&ps);
+        let out = compute_incidence_matrix(&ps.0);
         
         // NOTE - the order of axes does not matter, so use an iterator over
         // rows and collect them into a HashSet for comparison.
