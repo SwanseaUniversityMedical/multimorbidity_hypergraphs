@@ -90,8 +90,12 @@ fn compute_progset(data: &Array2<i8>) ->
         //.into_iter()
         .flat_map(|i| {
                 let progset_data = compute_single_progset(&data.index_axis(Axis(0), i).to_owned());
-                for (a, b, c, z) in izip!(progset_data.1, progset_data.2, progset_data.3, progset_data.4) {
-                    println!("{} {} {}, {}", a, b, c, z);
+                for (a, b, c, z) in izip!(
+                    progset_data.1, 
+                    progset_data.2, 
+                    progset_data.3, 
+                    progset_data.4
+                ) {
                     hyperedge_prev[c] += z;
                     hyperarc_prev[[a, b as usize]] += z;
                 }
@@ -99,8 +103,6 @@ fn compute_progset(data: &Array2<i8>) ->
             }
          )
         .collect();
-    println!("{:?}", hyperedge_prev);
-    //println!("{:?}", hyperarc_prev);
     
     (out, hyperedge_prev, hyperarc_prev)
     
