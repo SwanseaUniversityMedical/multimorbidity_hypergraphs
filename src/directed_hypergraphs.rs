@@ -90,15 +90,21 @@ fn compute_progset(data: &Array2<i8>) ->
         //.into_iter()
         .flat_map(|i| {
                 let progset_data = compute_single_progset(&data.index_axis(Axis(0), i).to_owned());
-                for (a, b, c, z) in izip!(
+                for (a, b, z) in izip!(
                     progset_data.1, 
                     progset_data.2, 
-                    progset_data.3, 
-                    progset_data.4
+                    progset_data.4.clone()
                 ) {
-                    hyperedge_prev[c] += z;
+                    //hyperedge_prev[c] += z;
                     hyperarc_prev[[a, b as usize]] += z;
                 }
+                
+                for (c, z) in izip!(progset_data.3, progset_data.4) {
+                    hyperedge_prev[c] += z;
+                }
+                
+                
+                
                 progset_data.0
             }
          )
@@ -139,9 +145,9 @@ fn compute_single_progset(
         // people that only have one disease have to be treated spearately
         1 => {
             (
-                HashSet::new(),//HashSet::from([data_ind.clone()]),
-                array![0],
-                array![data_ind[0]],
+                HashSet::new(),
+                array![], 
+                array![], 
                 array![2_usize.pow(data_ind[0] as u32)],
                 array![1.0],
             )
@@ -181,12 +187,16 @@ fn compute_single_progset(
                         .unwrap()
                 )
                 .collect();
-                
+            
             let bin_headtail: Array1<_> = bin_tail 
                     .iter()
                     .zip(head_node.clone())
                     .map(|(x, y)| x + 2_usize.pow(y as u32))
+                    .chain(
+                        std::iter::once(2_usize.pow(data_ind[0] as u32))
+                     ) // this is the single disease contribution
                     .collect();
+        
         
             let n_conds_prog: Array1<_> = out
                 .iter()
@@ -203,11 +213,12 @@ fn compute_single_progset(
             let contribution: Array1<f64> = n_conds_prog
                 .iter()
                 .map(|x| 1.0 / (cond_cnt[x] as f64))
+                .chain(
+                   std::iter::once(1.0)
+                ) // this is the single disease contribution
                 .collect();
                 
-            //println!("{:?}", data_ind.to_vec());
-            //println!("{:?}", out);
-            //println!("{:?} {:?} {:?}", bin_tail.to_vec(), head_node.to_vec(), bin_headtail.to_vec());
+            //println!("{:?} {:?} {:?}", bin_tail.to_vec(), head_node.to_vec(), contribution.to_vec());
             
             (    
                 out, // single prog_set
