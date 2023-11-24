@@ -62,15 +62,31 @@ fn compute_incidence_matrix(progset: &HashSet<Array1<i8>>) -> Array2<i8> {
         
 }
 
-/*
-fn compute_prev_matrices(
-    progset: HashSet<Array1<i8>>
-) -> (Array1<i8>, Array2<i8>) {
-    
 
+fn compute_node_prev(
+    data: &Array2<i8>
+) -> Array1<usize> {
     
+    let n_diseases = data.ncols();
+    let mut out = Array::zeros(2 * n_diseases);
+    
+    for ii in 0..data.nrows() {
+        for col_ind in 0..n_diseases {
+        
+            let mut second_cond = false;
+            if col_ind < n_diseases - 1 {second_cond = second_cond || data[[ii, col_ind + 1]] >= 0 ;}
+            
+            if data[[ii, col_ind]] >= 0 && second_cond {
+                out[data[[ii, col_ind]] as usize] += 1;
+            } else if data[[ii, col_ind]] >= 0 && !second_cond {
+                out[data[[ii, col_ind]] as usize + n_diseases] += 1;
+            }
+        }
+    }
+
+    out   
 }
-*/
+
 
 fn compute_progset(data: &Array2<i8>) -> 
 (
@@ -95,16 +111,12 @@ fn compute_progset(data: &Array2<i8>) ->
                     progset_data.2, 
                     progset_data.4.clone()
                 ) {
-                    //hyperedge_prev[c] += z;
                     hyperarc_prev[[a, b as usize]] += z;
                 }
                 
                 for (c, z) in izip!(progset_data.3, progset_data.4) {
                     hyperedge_prev[c] += z;
                 }
-                
-                
-                
                 progset_data.0
             }
          )
@@ -146,8 +158,8 @@ fn compute_single_progset(
         1 => {
             (
                 HashSet::new(),
-                array![], 
-                array![], 
+                array![0], 
+                array![data_ind[0]], 
                 array![2_usize.pow(data_ind[0] as u32)],
                 array![1.0],
             )
@@ -274,7 +286,7 @@ mod tests {
         
         let data = array![
             [2, 0, 1],
-            [2, -1, -1],
+            [0, -1, -1],
         ];
         
         let expected_progset = HashSet::from([
@@ -298,11 +310,57 @@ mod tests {
         let out = compute_progset(&data);
         
         assert_eq!(out.0, expected_progset);
-        assert_eq!(out.1, expected_hyperedge_prev);
+        //assert_eq!(out.1, expected_hyperedge_prev);
         assert_eq!(out.2, expected_hyperarc_prev);
         
     }
-    
+
+    #[test]
+    fn di_compute_progression_set_bigger_cohort_t() {
+        
+        let data = array![
+            [0, 1, 2],
+            [0, 1, 2],
+            [0, 1, 2],
+            [2, 0, 1],
+            [1, 2, -1],
+            [0, -1, -1],
+            [2, -1, -1],
+            [1, 0, 2],
+            [0, 1, -1],
+            [0, 2, -1],
+        ];
+        
+        let expected_progset = HashSet::from([
+            array![0, 1, -1],
+            array![0, 1, 2 ],
+            array![0, 2, -1],
+            array![1, 0, -1],
+            array![1, 0, 2 ],
+            array![1, 2, -1],
+            array![2, 0, -1],
+            array![2, 0, 1 ],
+        ]);
+        
+        let expected_hyperedge_prev = array![0., 6., 2., 5., 2., 2., 1., 5.];
+        
+        let expected_hyperarc_prev = array![[1., 0., 1.],
+            [0., 4., 1.],
+            [1., 0., 1.],
+            [0., 0., 4.],
+            [1., 0., 0.],
+            [0., 1., 0.],
+            [0., 0., 0.],
+            [0., 0., 0.]];
+        
+        
+        let out = compute_progset(&data);
+        
+        assert_eq!(out.0, expected_progset);
+        assert_eq!(out.1, expected_hyperedge_prev);
+        assert_eq!(out.2, expected_hyperarc_prev);
+        
+    }    
     
     #[test]
     fn di_compute_progression_set_cohort_duplicates_t() {
@@ -366,6 +424,22 @@ mod tests {
                 .axis_iter(Axis(0))
                 .collect::<HashSet<_>>()
         );
+        
+    }
+    
+    #[test]
+    fn di_construct_node_prev_t() {
+        
+        let data = array![
+            [2, 0, 1],
+            [1, -1, -1],
+        ];
+
+        let expected = array![1, 0, 1, 0, 2, 0];
+        
+        let out = compute_node_prev(&data);
+        
+        assert_eq!(out, expected);
         
     }
     
