@@ -24,6 +24,34 @@ pub fn compute_directed_hypergraph(
 */
 
 
+
+fn compute_hyperedge_worklist(inc_mat: &Array2<i8>) -> Array2<i8> {
+    
+    let n_rows = inc_mat.nrows();
+    let n_cols = inc_mat.ncols();
+
+    Array2::from_shape_vec(
+        (n_rows, n_cols),
+        inc_mat
+            .axis_iter(Axis(0))
+            .flat_map(|row| {
+                let mut inds: Vec<i8> = row
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &x)| x != 0)
+                    .map(|(index, _)| index as i8)
+                    .collect();
+
+                inds.extend(std::iter::repeat(-1).take(n_cols - inds.len()));
+
+                inds
+            })
+            .collect::<Vec<i8>>()
+    ).unwrap()
+}
+
+
+
 fn compute_incidence_matrix(progset: &HashSet<Array1<i8>>) -> Array2<i8> {
     
     let progset_vec: Vec<_> = progset.into_iter().collect();
@@ -470,6 +498,40 @@ mod tests {
         assert_eq!(out, expected);
         
     }
+    
+    #[test]
+    fn di_construct_hyperedge_worklist_t() {
+        
+        let data = array![[2, 0, 1],
+            [0, -1, -1]];
+            
+        let expected = array![[ 0, -1, -1],
+            [ 1, -1, -1],
+            [ 2, -1, -1],
+            [ 0,  2, -1],
+            [ 0,  1,  2]];
+        
+        let ps = compute_progset(&data);
+        let inc_mat = compute_incidence_matrix(&ps.0);
+        let out = compute_hyperedge_worklist(&inc_mat);
+        
+        
+        println!("{:?}", expected);
+        println!("{:?}", out);
+        
+        // NOTE - the order of axes does't matter again
+        assert_eq!(
+            out
+                .axis_iter(Axis(0))
+                .collect::<HashSet<_>>(), 
+            expected
+                .axis_iter(Axis(0))
+                .collect::<HashSet<_>>()
+        );
+    }
+    
+    
+   
     
     /*
     #[test]
