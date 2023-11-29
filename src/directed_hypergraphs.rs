@@ -102,7 +102,7 @@ fn compute_progset(data: &Array2<i8>) ->
     let mut hyperarc_prev: Array2<f64>  = Array::zeros((max_hyperedges, n_diseases));
     let mut hyperedge_prev: Array1<f64> = Array::zeros(max_hyperedges);
 
-    let out = (0..n_rows)
+    let mut out: HashSet<Array1<i8>> = (0..n_rows)
         //.into_iter()
         .flat_map(|i| {
                 let progset_data = compute_single_progset(&data.index_axis(Axis(0), i).to_owned());
@@ -121,6 +121,20 @@ fn compute_progset(data: &Array2<i8>) ->
             }
          )
         .collect();
+        
+    if true { // add single diseases
+        let additional: HashSet<Array1<i8>> = (0..n_diseases)
+            .map(|i| {
+                let mut i_vec: Vec<i8> = vec![i as i8];
+                i_vec.extend(&vec![-1; n_diseases - 1]);
+                Array1::from_vec(i_vec)
+            })
+            .collect();
+        
+        out.extend(additional);
+    }
+    
+    
     
     (out, hyperedge_prev, hyperarc_prev)
     
@@ -292,10 +306,12 @@ mod tests {
         let expected_progset = HashSet::from([
             array![ 2,  0, -1],
             array![ 2,  0,  1],
-            //array![2, -1 ,-1] // progsets must have at least 2 diseases in them
+            array![2, -1 ,-1],
+            array![1, -1 ,-1],
+            array![0, -1 ,-1],
         ]);
         
-        let expected_hyperedge_prev = array![0., 0., 0., 0., 2., 1., 0., 1.];
+        let expected_hyperedge_prev = array![0., 1., 0., 0., 1., 1., 0., 1.];
         
         let expected_hyperarc_prev = array![[0., 0., 0.],
             [0., 0., 0.],
@@ -310,7 +326,7 @@ mod tests {
         let out = compute_progset(&data);
         
         assert_eq!(out.0, expected_progset);
-        //assert_eq!(out.1, expected_hyperedge_prev);
+        assert_eq!(out.1, expected_hyperedge_prev);
         assert_eq!(out.2, expected_hyperarc_prev);
         
     }
@@ -340,6 +356,9 @@ mod tests {
             array![1, 2, -1],
             array![2, 0, -1],
             array![2, 0, 1 ],
+            array![2, -1, -1 ],
+            array![1, -1, -1 ],
+            array![0, -1, -1 ],
         ]);
         
         let expected_hyperedge_prev = array![0., 6., 2., 5., 2., 2., 1., 5.];
@@ -376,6 +395,9 @@ mod tests {
         let expected = HashSet::from([
             array![ 2,  0, -1],
             array![ 2,  0,  1],
+            array![2, -1, -1 ],
+            array![1, -1, -1 ],
+            array![0, -1, -1 ],
         ]);
         
         
@@ -408,11 +430,17 @@ mod tests {
             [-1,  1, -1],
             [ 0, -1,  1],
             [ 1, -1,  0],
-            [-1,  0,  1]
+            [-1,  0,  1],
+            [1,  0,  0],
+            [0,  1,  0],
+            [0,  0,  1],
         ];
         
         let ps = compute_progset(&data);
         let out = compute_incidence_matrix(&ps.0);
+        
+        println!("{:?}", expected);
+        println!("{:?}", out);
         
         // NOTE - the order of axes does not matter, so use an iterator over
         // rows and collect them into a HashSet for comparison.
