@@ -11,6 +11,7 @@ use ndarray::{
     s,
 };
 use std::collections::{HashSet, HashMap}; // maybe use an indexset instead of a hashset here?
+use indexmap::IndexSet;
 use itertools::izip;
 
 /*
@@ -52,14 +53,14 @@ fn compute_hyperedge_worklist(inc_mat: &Array2<i8>) -> Array2<i8> {
 
 
 
-fn compute_incidence_matrix(progset: &HashSet<Array1<i8>>) -> Array2<i8> {
+fn compute_incidence_matrix(progset: &IndexSet<Array1<i8>>) -> Array2<i8> {
     
     let progset_vec: Vec<_> = progset.into_iter().collect();
     
     let n_diseases = progset_vec[0].len();
     //let max_hyperedges = 2_usize.pow(n_diseases as u32);
     
-    let mut hyperedges: HashSet<Array1<i8>> = HashSet::new();
+    let mut hyperedges: IndexSet<Array1<i8>> = IndexSet::new();
     
     for a in progset_vec.iter() {
         
@@ -118,7 +119,7 @@ fn compute_node_prev(
 
 fn compute_progset(data: &Array2<i8>) -> 
 (
-    HashSet<Array1<i8>>,
+    IndexSet<Array1<i8>>,
     Array1<f64>,
     Array2<f64>,
 ) {
@@ -130,7 +131,7 @@ fn compute_progset(data: &Array2<i8>) ->
     let mut hyperarc_prev: Array2<f64>  = Array::zeros((max_hyperedges, n_diseases));
     let mut hyperedge_prev: Array1<f64> = Array::zeros(max_hyperedges);
 
-    let mut out: HashSet<Array1<i8>> = (0..n_rows)
+    let mut out: IndexSet<Array1<i8>> = (0..n_rows)
         //.into_iter()
         .flat_map(|i| {
                 let progset_data = compute_single_progset(&data.index_axis(Axis(0), i).to_owned());
@@ -151,7 +152,7 @@ fn compute_progset(data: &Array2<i8>) ->
         .collect();
         
     if true { // add single diseases
-        let additional: HashSet<Array1<i8>> = (0..n_diseases)
+        let additional: IndexSet<Array1<i8>> = (0..n_diseases)
             .map(|i| {
                 let mut i_vec: Vec<i8> = vec![i as i8];
                 i_vec.extend(&vec![-1; n_diseases - 1]);
@@ -178,7 +179,7 @@ fn bincount(arr: &ArrayView1<usize>) -> HashMap<usize, usize> {
 fn compute_single_progset(
     data_ind: &Array1<i8>
 ) -> (
-    HashSet<Array1<i8>>, // single prog_set
+    IndexSet<Array1<i8>>, // single prog_set
     Array1<usize>, // bin_tail
     Array1<i8>, // head_node 
     Array1<usize>, // bin_headtail
@@ -199,7 +200,7 @@ fn compute_single_progset(
         // people that only have one disease have to be treated spearately
         1 => {
             (
-                HashSet::new(),
+                IndexSet::new(),
                 array![0], 
                 array![data_ind[0]], 
                 array![2_usize.pow(data_ind[0] as u32)],
@@ -208,7 +209,7 @@ fn compute_single_progset(
         },
         
         _ => {
-            let out:HashSet<Array1<i8>> = (1..data_ind.len())
+            let out:IndexSet<Array1<i8>> = (1..data_ind.len())
                 .filter(|&i| data_ind[i] >= 0)
                 .map(|i| {
                     let mut i_vec = data_ind.slice(s![0..(i + 1)]).to_vec();
@@ -301,7 +302,7 @@ mod tests {
     fn di_compute_progression_set_t () {
         
         let data = array![2, 0, 1];
-        let expected = HashSet::from([
+        let expected = IndexSet::from([
             array![ 2,  0, -1],
             array![ 2,  0,  1]
         ]);
@@ -316,7 +317,7 @@ mod tests {
     fn di_compute_progression_set_singleton_t () {
         
         let data = array![2, -1, -1];
-        let expected: HashSet<Array1<i8>> = HashSet::new();
+        let expected: IndexSet<Array1<i8>> = IndexSet::new();
         
         let out = compute_single_progset(&data);
         
@@ -331,7 +332,7 @@ mod tests {
             [0, -1, -1],
         ];
         
-        let expected_progset = HashSet::from([
+        let expected_progset = IndexSet::from([
             array![ 2,  0, -1],
             array![ 2,  0,  1],
             array![2, -1 ,-1],
@@ -375,7 +376,7 @@ mod tests {
             [0, 2, -1],
         ];
         
-        let expected_progset = HashSet::from([
+        let expected_progset = IndexSet::from([
             array![0, 1, -1],
             array![0, 1, 2 ],
             array![0, 2, -1],
@@ -420,7 +421,7 @@ mod tests {
             [2, 0, 1],
         ];
         
-        let expected = HashSet::from([
+        let expected = IndexSet::from([
             array![ 2,  0, -1],
             array![ 2,  0,  1],
             array![2, -1, -1 ],
