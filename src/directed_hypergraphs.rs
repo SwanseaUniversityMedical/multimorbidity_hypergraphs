@@ -24,7 +24,30 @@ pub fn compute_directed_hypergraph(
 }
 */
 
-
+fn compute_hyperedge_info(progset: &IndexSet<Array1<i8>>) -> (Array1<i32>, Array1<i32>) {
+    
+    (progset
+        .iter()
+        .map(|edge| {
+            edge 
+                .iter()
+                .filter(|&x| *x >= 0)
+                .map(|&x| 2_i32.pow(x as u32))
+                .sum::<i32>()
+        })
+        .collect::<Array1<i32>>(), 
+    progset
+        .iter()
+        .map(|edge| {
+            edge 
+                .iter()
+                .filter(|&x| *x >= 0)
+                .count() as i32
+        })
+        .collect::<Array1<i32>>()
+    )
+    
+}
 
 fn compute_hyperedge_worklist(inc_mat: &Array2<i8>) -> Array2<i8> {
     
@@ -531,6 +554,28 @@ mod tests {
         );
     }
     
+    #[test]
+    fn di_construct_hyperedge_info_t() {
+        
+        let data = array![[2, 0, 1],
+            [0, -1, -1]];
+            
+        let ps = compute_progset(&data);
+        let out = compute_hyperedge_info(&ps.0);
+        
+        let expected = (
+            array![5, 7, 1, 2, 4],
+            array![2, 3, 1, 1, 1]
+        );
+        
+        println!("{:?}", ps.0);
+        
+        println!("{:?}", expected);
+        println!("{:?}", out);
+        
+        assert_eq!(out, expected);
+        
+    }
     
    
     
