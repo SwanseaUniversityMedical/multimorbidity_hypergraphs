@@ -5,7 +5,6 @@ use ndarray::{
     Axis,
 };
 
-
 pub fn overlap_coefficient(data: ArrayView2<u8>) -> f64 {
     
     // Calculates the overlap coefficient for an edge, or the prevalence for 
