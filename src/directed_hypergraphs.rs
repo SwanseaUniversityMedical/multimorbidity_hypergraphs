@@ -10,7 +10,7 @@ use ndarray::{
     Axis,
     s,
 };
-use std::collections::{HashSet, HashMap}; // maybe use an indexset instead of a hashset here?
+use std::collections::{HashSet, HashMap};
 use indexmap::IndexSet;
 use itertools::izip;
 
@@ -23,6 +23,19 @@ pub fn compute_directed_hypergraph(
     
 }
 */
+
+
+fn compute_hyperarc_weights(
+    hyperarc_worklist: &IndexSet<Array1<i8>>,
+    hyperedge_worklist: &Array2<i8>,
+    hyperedge_prev: &Array1<f64>,
+    hyperarc_prev: &Array2<f64>,
+    hyperedge_weights: &Array1<f64>
+) -> Array1<f64> {
+    
+    array![0.0]
+    
+}
 
 fn compute_hyperedge_weights(
     worklist: &IndexSet<Array1<i8>>,
@@ -73,8 +86,8 @@ fn compute_hyperedge_weights(
 
     
         
-    println!("{:?}", numerator);
-    println!("{:?}", denominator);
+    //println!("{:?}", numerator);
+    //println!("{:?}", denominator);
     
     numerator
         .iter()
@@ -466,7 +479,7 @@ mod tests {
             array![0, 1, 2 ],
             array![0, 2, -1],
             array![1, 0, -1],
-            array![1, 0, 2 ],
+            array![1, 0, 2 ], // this is not produced by Jamie's code...
             array![1, 2, -1],
             array![2, 0, -1],
             array![2, 0, 1 ],
@@ -661,6 +674,38 @@ mod tests {
         
     }
     
+    #[test]
+    fn di_compute_hyperarc_weights_t() {
+        let data = array![[2, 0, 1],
+            [0, -1, -1]];
+            
+        let ps = compute_progset(&data);
+        let info = compute_hyperedge_info(&ps.0);
+        let hyperedge_weights = compute_hyperedge_weights(
+            &ps.0,
+            &info.0,
+            &ps.1
+        );
+        let inc_mat = compute_incidence_matrix(&ps.0);
+        let hyperedge_wl = compute_hyperedge_worklist(&inc_mat);
+        
+        let out: Array1<f64> = compute_hyperarc_weights(
+            &ps.0, // hyperarc_worklist
+            &hyperedge_wl,
+            &ps.1, // hyperedge_prev 
+            &ps.2, // hyperarc_prev 
+            &hyperedge_weights,
+        );
+        
+        let expected: Array1<f64> = array![0.,  f64::NAN, 0., 0.25, 0.25];
+        
+        println!("{:?}", ps.0);
+        
+        println!("{:?}", expected);
+        println!("{:?}", out);
+        
+        assert_eq!(out, expected);
+    }
    
     
     /*
