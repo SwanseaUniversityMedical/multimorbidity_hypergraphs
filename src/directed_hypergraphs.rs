@@ -33,6 +33,49 @@ fn compute_hyperarc_weights(
     hyperedge_weights: &Array1<f64>
 ) -> Array1<f64> {
     
+    println!("Start function");
+
+    let n_diseases = hyperedge_worklist.ncols();
+
+    for h in hyperedge_worklist.axis_iter(Axis(0)) {
+        let hyperedge = h
+            .iter()
+            .filter(|&&x| x >= 0)
+            .collect::<Array1<_>>();
+        
+        let degree = hyperedge.len();
+        
+        let hyperedge_idx = hyperedge
+            .iter()
+            .map(|&&x| 2_u32.pow(x as u32))
+            .sum::<u32>();
+        
+        let mut child_worklist: Array2<i32> = Array2::ones((degree, n_diseases));
+        child_worklist
+            .iter_mut()
+            .for_each(|x| *x = -*x);
+            
+        println!("{:?}", child_worklist);
+        
+        for n in 0..degree {
+            
+            let head = *hyperedge[n] as i32;
+            let tail = hyperedge
+                .slice(s![..n])
+                .map(|&&x| 2_i32.pow(x as u32))
+                .sum() + 
+                    hyperedge
+                .slice(s![n+1..])
+                .map(|&&x| 2_i32.pow(x as u32))
+                .sum();
+                
+            println!("{} {}", head, tail);
+        }
+          
+        //println!("{:?}, {}", hyperedge, hyperedge_idx);
+    }
+    
+    println!("End function");
     array![0.0]
     
 }
