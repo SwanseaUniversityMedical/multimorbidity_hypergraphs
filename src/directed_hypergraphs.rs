@@ -26,57 +26,103 @@ pub fn compute_directed_hypergraph(
 
 
 fn compute_hyperarc_weights(
-    hyperarc_worklist: &IndexSet<Array1<i8>>,
     hyperedge_worklist: &Array2<i8>,
     hyperedge_prev: &Array1<f64>,
     hyperarc_prev: &Array2<f64>,
     hyperedge_weights: &Array1<f64>
-) -> Array1<f64> {
+) -> (IndexSet<Array1<i8>>, Array1<f64>) {
     
-    println!("Start function");
+    let mut hyperarcs: IndexSet<Array1<i8>> = IndexSet::new();
+    let mut hyperarc_weights: Vec<f64> = Vec::new();
 
     let n_diseases = hyperedge_worklist.ncols();
-
-    for h in hyperedge_worklist.axis_iter(Axis(0)) {
+    
+    for (h_idx, h) in hyperedge_worklist.axis_iter(Axis(0)).enumerate() {
         let hyperedge = h
             .iter()
             .filter(|&&x| x >= 0)
+            .map(|&x| x) // this looks a bit ugly, but it's needed to dereference the values in h
             .collect::<Array1<_>>();
         
         let degree = hyperedge.len();
         
-        let hyperedge_idx = hyperedge
-            .iter()
-            .map(|&&x| 2_u32.pow(x as u32))
-            .sum::<u32>();
-        
-        let mut child_worklist: Array2<i32> = Array2::ones((degree, n_diseases));
+        let mut child_worklist: Array2<i8> = Array2::ones((degree, n_diseases));
         child_worklist
             .iter_mut()
             .for_each(|x| *x = -*x);
             
-        println!("{:?}", child_worklist);
-        
-        for n in 0..degree {
+        let mut child_prevs: Array1<f64> = Array1::zeros(degree);
             
-            let head = *hyperedge[n] as i32;
-            let tail = hyperedge
-                .slice(s![..n])
-                .map(|&&x| 2_i32.pow(x as u32))
-                .sum() + 
-                    hyperedge
-                .slice(s![n+1..])
-                .map(|&&x| 2_i32.pow(x as u32))
-                .sum();
+        if degree > 1 {
+        
+            let hyperedge_idx = hyperedge
+                .iter()
+                .map(|&x| 2_usize.pow(x as u32))
+                .sum::<usize>();
                 
-            println!("{} {}", head, tail);
+            for n in 0..degree {
+                
+                let head = hyperedge[n] as usize;
+                let tail = hyperedge
+                    .slice(s![..n])
+                    .map(|&x| 2_usize.pow(x as u32))
+                    .sum() + 
+                        hyperedge
+                    .slice(s![n+1..])
+                    .map(|&x| 2_usize.pow(x as u32))
+                    .sum();
+                    
+                
+                let hyperedge_set: HashSet<_> = hyperedge
+                        .iter()
+                        .cloned()
+                        .collect();
+                
+                let cw_add = hyperedge_set
+                        .difference(&HashSet::from_iter(std::iter::once(head as i8)))
+                        .cloned()
+                        .chain(std::iter::once(head as i8))
+                        .collect::<Vec<_>>();
+                
+                for i in 0..cw_add.len() {
+                    child_worklist[[n, i]] = cw_add[i] as i8;
+                }
+                
+                child_prevs[n] = hyperarc_prev[[tail, head]];
+            }
+            
+            let child_weights: Array1<_> = child_prevs 
+                .iter()
+                .map(|x| hyperedge_weights[h_idx] * x / (hyperedge_prev[hyperedge_idx] as f64))
+                .collect();
+            
+            for i in 0..child_weights.len() {
+                if child_weights[i] > 0.0 {
+                    hyperarcs.insert(child_worklist.index_axis(Axis(0), i).to_owned());
+                    hyperarc_weights.push(child_weights[i]);
+                }
+            }
+            
+        } else {
+            
+            let hyperedge_idx = hyperedge[0] as usize;
+            child_worklist[[0, 0]] = hyperedge_idx as i8;
+            let child_prev = hyperarc_prev[[0, hyperedge_idx]];
+            let numerator = child_prev * hyperedge_weights[h_idx];
+            let denominator = hyperedge_prev[hyperedge_idx] as f64;
+
+            hyperarcs.insert(child_worklist.index_axis(Axis(0), 0).to_owned());
+
+            if denominator == 0.0 {
+                hyperarc_weights.push(0.0);
+            } else {
+                hyperarc_weights.push(numerator / denominator);
+            }
+        
         }
-          
-        //println!("{:?}, {}", hyperedge, hyperedge_idx);
     }
     
-    println!("End function");
-    array![0.0]
+    (hyperarcs, hyperarc_weights.into())
     
 }
 
@@ -125,12 +171,6 @@ fn compute_hyperedge_weights(
         }
  
     }
-
-
-    
-        
-    //println!("{:?}", numerator);
-    //println!("{:?}", denominator);
     
     numerator
         .iter()
@@ -732,22 +772,32 @@ mod tests {
         let inc_mat = compute_incidence_matrix(&ps.0);
         let hyperedge_wl = compute_hyperedge_worklist(&inc_mat);
         
-        let out: Array1<f64> = compute_hyperarc_weights(
-            &ps.0, // hyperarc_worklist
+        let out: (IndexSet<Array1<i8>>, Array1<f64>) = compute_hyperarc_weights(
+            //&ps.0, // hyperarc_worklist
             &hyperedge_wl,
             &ps.1, // hyperedge_prev 
             &ps.2, // hyperarc_prev 
             &hyperedge_weights,
         );
         
-        let expected: Array1<f64> = array![0.,  f64::NAN, 0., 0.25, 0.25];
+        let mut hyperarc_set:IndexSet<Array1<i8>> = IndexSet::new();
         
-        println!("{:?}", ps.0);
+        hyperarc_set.insert(array![2, 0, -1]);
+        hyperarc_set.insert(array![2, 0, 1]);
+        hyperarc_set.insert(array![0, -1, -1]);
+        hyperarc_set.insert(array![1, -1, -1]);
+        hyperarc_set.insert(array![2, -1, -1]);
+        
+        let expected: (IndexSet<Array1<i8>>, Array1<f64>) = (
+            hyperarc_set, 
+            array![0.25, 0.25, 0., 0., 0.,]
+        );
         
         println!("{:?}", expected);
         println!("{:?}", out);
         
-        assert_eq!(out, expected);
+        assert_eq!(out.0, expected.0);
+        assert_eq!(out.1, expected.1);
     }
    
     
