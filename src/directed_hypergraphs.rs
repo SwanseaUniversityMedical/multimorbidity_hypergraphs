@@ -61,8 +61,6 @@ fn compute_hyperarc_weights(
     
     let mut hyperarcs: Vec<HyperArc> = Vec::new();
     let mut hyperarc_weights: Vec<f64> = Vec::new();
-
-    let n_diseases = hyperedge_worklist.ncols();
     
     for (h_idx, h) in hyperedge_worklist.axis_iter(Axis(0)).enumerate() {
         let hyperedge = h
@@ -73,12 +71,7 @@ fn compute_hyperarc_weights(
         
         let degree = hyperedge.len();
         
-        let mut child_worklist: Array2<i8> = Array2::ones((degree, n_diseases));
-        child_worklist
-            .iter_mut()
-            .for_each(|x| *x = -*x);
-        
-        let mut child_worklist_new: Vec<HyperArc> = Vec::new();
+        let mut child_worklist: Vec<HyperArc> = Vec::new();
         
         let mut child_prevs: Array1<f64> = Array1::zeros(degree);
             
@@ -113,7 +106,7 @@ fn compute_hyperarc_weights(
                         .cloned()
                         .collect::<HashSet<_>>();
                 
-                child_worklist_new.push(
+                child_worklist.push(
                     HyperArc{
                         tail: cw_add_p1, 
                         head: head as i8
@@ -136,7 +129,7 @@ fn compute_hyperarc_weights(
                     // of the vec don't implement Copy. Therefore, using remove
                     // so that the data no longer exists in child_worklist and is free
                     // to move to hyperarcs. Looping backwards to avoid indexing weirdness.
-                    hyperarcs.push(child_worklist_new.remove(i));
+                    hyperarcs.push(child_worklist.remove(i));
                     hyperarc_weights.push(child_weights[i]);
                 }
             }
