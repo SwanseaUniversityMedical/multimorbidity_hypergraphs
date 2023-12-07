@@ -24,6 +24,8 @@ pub fn compute_directed_hypergraph(
 }
 */
 
+// TODO - write docstrings!
+// TODO - clean up functions 
 
 fn compute_hyperarc_weights(
     hyperedge_worklist: &Array2<i8>,
@@ -491,6 +493,7 @@ mod tests {
         let out = compute_single_progset(&data);
         
         assert_eq!(out.0, expected);
+        //TODO - write tests for the other outputs of this function
     }
     
     
@@ -773,7 +776,6 @@ mod tests {
         let hyperedge_wl = compute_hyperedge_worklist(&inc_mat);
         
         let out: (IndexSet<Array1<i8>>, Array1<f64>) = compute_hyperarc_weights(
-            //&ps.0, // hyperarc_worklist
             &hyperedge_wl,
             &ps.1, // hyperedge_prev 
             &ps.2, // hyperarc_prev 
