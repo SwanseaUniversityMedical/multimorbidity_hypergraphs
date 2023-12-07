@@ -1,5 +1,5 @@
 
-//use crate::types::*;
+use crate::types::*;
 
 use ndarray::{
     array,
@@ -14,27 +14,52 @@ use std::collections::{HashSet, HashMap};
 use indexmap::IndexSet;
 use itertools::izip;
 
-/*
+
 pub fn compute_directed_hypergraph(
     data: &Array2<i8>
-) -> DiHypergraphBase {
-    
-    DiHypergraphBase{incidence_matrix: Array2::zeros((1,1))}
+    ) -> DiHypergraphBase {
+   
+        let ps = compute_progset(&data);
+        let inc_mat = compute_incidence_matrix(&ps.0);
+        let info = compute_hyperedge_info(&ps.0);
+        let hyperedge_weights = compute_hyperedge_weights(
+            &ps.0,
+            &info.0,
+            &ps.1
+        );
+        let hyperedge_wl = compute_hyperedge_worklist(&inc_mat);
+        
+        let hyperarc: (Array1<HyperArc>, Array1<f64>) = compute_hyperarc_weights(
+            &hyperedge_wl,
+            &ps.1, // hyperedge_prev 
+            &ps.2, // hyperarc_prev 
+            &hyperedge_weights,
+        );
+   
+    DiHypergraphBase{
+        incidence_matrix: inc_mat,
+        hyperedge_list: ps.0,
+        hyperedge_weights: hyperedge_weights,
+        hyperarc_list: hyperarc.0,
+        hyperarc_weights: hyperarc.1,
+    }
     
 }
-*/
+
 
 // TODO - write docstrings!
 // TODO - clean up functions 
+// TODO - make sure everything that's calculated is actually needed
+
 
 fn compute_hyperarc_weights(
     hyperedge_worklist: &Array2<i8>,
     hyperedge_prev: &Array1<f64>,
     hyperarc_prev: &Array2<f64>,
     hyperedge_weights: &Array1<f64>
-) -> (IndexSet<Array1<i8>>, Array1<f64>) {
+) -> (Array1<HyperArc>, Array1<f64>) {
     
-    let mut hyperarcs: IndexSet<Array1<i8>> = IndexSet::new();
+    let mut hyperarcs: Vec<HyperArc> = Vec::new();
     let mut hyperarc_weights: Vec<f64> = Vec::new();
 
     let n_diseases = hyperedge_worklist.ncols();
@@ -52,7 +77,9 @@ fn compute_hyperarc_weights(
         child_worklist
             .iter_mut()
             .for_each(|x| *x = -*x);
-            
+        
+        let mut child_worklist_new: Vec<HyperArc> = Vec::new();
+        
         let mut child_prevs: Array1<f64> = Array1::zeros(degree);
             
         if degree > 1 {
@@ -80,27 +107,36 @@ fn compute_hyperarc_weights(
                         .cloned()
                         .collect();
                 
-                let cw_add = hyperedge_set
+                
+                let cw_add_p1 = hyperedge_set
                         .difference(&HashSet::from_iter(std::iter::once(head as i8)))
                         .cloned()
-                        .chain(std::iter::once(head as i8))
-                        .collect::<Vec<_>>();
+                        .collect::<HashSet<_>>();
                 
-                for i in 0..cw_add.len() {
-                    child_worklist[[n, i]] = cw_add[i] as i8;
-                }
+                child_worklist_new.push(
+                    HyperArc{
+                        tail: cw_add_p1, 
+                        head: head as i8
+                    }
+                );
                 
                 child_prevs[n] = hyperarc_prev[[tail, head]];
             }
+            
             
             let child_weights: Array1<_> = child_prevs 
                 .iter()
                 .map(|x| hyperedge_weights[h_idx] * x / (hyperedge_prev[hyperedge_idx] as f64))
                 .collect();
             
-            for i in 0..child_weights.len() {
+            for i in (0..child_weights.len()).rev() {
                 if child_weights[i] > 0.0 {
-                    hyperarcs.insert(child_worklist.index_axis(Axis(0), i).to_owned());
+                    // borrow checker shenanigans here:
+                    // you can't use the [] indexing operator when the elements 
+                    // of the vec don't implement Copy. Therefore, using remove
+                    // so that the data no longer exists in child_worklist and is free
+                    // to move to hyperarcs. Looping backwards to avoid indexing weirdness.
+                    hyperarcs.push(child_worklist_new.remove(i));
                     hyperarc_weights.push(child_weights[i]);
                 }
             }
@@ -108,13 +144,17 @@ fn compute_hyperarc_weights(
         } else {
             
             let hyperedge_idx = hyperedge[0] as usize;
-            child_worklist[[0, 0]] = hyperedge_idx as i8;
             let child_prev = hyperarc_prev[[0, hyperedge_idx]];
             let numerator = child_prev * hyperedge_weights[h_idx];
             let denominator = hyperedge_prev[hyperedge_idx] as f64;
 
-            hyperarcs.insert(child_worklist.index_axis(Axis(0), 0).to_owned());
-
+            hyperarcs.push(
+                HyperArc{
+                    tail: HashSet::new(), 
+                    head: hyperedge_idx as i8
+                }
+            );
+            
             if denominator == 0.0 {
                 hyperarc_weights.push(0.0);
             } else {
@@ -124,9 +164,10 @@ fn compute_hyperarc_weights(
         }
     }
     
-    (hyperarcs, hyperarc_weights.into())
+    (hyperarcs.into(), hyperarc_weights.into())
     
 }
+
 
 fn compute_hyperedge_weights(
     worklist: &IndexSet<Array1<i8>>,
@@ -241,7 +282,6 @@ fn compute_incidence_matrix(progset: &IndexSet<Array1<i8>>) -> Array2<i8> {
     let progset_vec: Vec<_> = progset.into_iter().collect();
     
     let n_diseases = progset_vec[0].len();
-    //let max_hyperedges = 2_usize.pow(n_diseases as u32);
     
     let mut hyperedges: IndexSet<Array1<i8>> = IndexSet::new();
     
@@ -278,7 +318,7 @@ fn compute_incidence_matrix(progset: &IndexSet<Array1<i8>>) -> Array2<i8> {
 fn compute_node_prev(
     data: &Array2<i8>
 ) -> Array1<usize> {
-    
+    // TODO - is this function needed
     let n_diseases = data.ncols();
     let mut out = Array::zeros(2 * n_diseases);
     
@@ -334,19 +374,16 @@ fn compute_progset(data: &Array2<i8>) ->
          )
         .collect();
         
-    if true { // add single diseases
-        let additional: IndexSet<Array1<i8>> = (0..n_diseases)
-            .map(|i| {
-                let mut i_vec: Vec<i8> = vec![i as i8];
-                i_vec.extend(&vec![-1; n_diseases - 1]);
-                Array1::from_vec(i_vec)
-            })
-            .collect();
-        
-        out.extend(additional);
-    }
+    // add single diseases
+    let additional: IndexSet<Array1<i8>> = (0..n_diseases)
+        .map(|i| {
+            let mut i_vec: Vec<i8> = vec![i as i8];
+            i_vec.extend(&vec![-1; n_diseases - 1]);
+            Array1::from_vec(i_vec)
+        })
+        .collect();
     
-    
+    out.extend(additional);
     
     (out, hyperedge_prev, hyperarc_prev)
     
@@ -456,8 +493,6 @@ fn compute_single_progset(
                 ) // this is the single disease contribution
                 .collect();
                 
-            //println!("{:?} {:?} {:?}", bin_tail.to_vec(), head_node.to_vec(), contribution.to_vec());
-            
             (    
                 out, // single prog_set
                 
@@ -540,7 +575,7 @@ mod tests {
         
         assert_eq!(out.0, expected_progset);
         assert_eq!(out.1, expected_hyperedge_prev);
-        //assert_eq!(out.2, expected_hyperarc_prev); // TODO - this test fails. 
+        assert_eq!(out.2, expected_hyperarc_prev); // TODO - this test fails. 
         
     }
 
@@ -775,23 +810,23 @@ mod tests {
         let inc_mat = compute_incidence_matrix(&ps.0);
         let hyperedge_wl = compute_hyperedge_worklist(&inc_mat);
         
-        let out: (IndexSet<Array1<i8>>, Array1<f64>) = compute_hyperarc_weights(
+        let out: (Array1<HyperArc>, Array1<f64>) = compute_hyperarc_weights(
             &hyperedge_wl,
             &ps.1, // hyperedge_prev 
             &ps.2, // hyperarc_prev 
             &hyperedge_weights,
         );
         
-        let mut hyperarc_set:IndexSet<Array1<i8>> = IndexSet::new();
+        let mut hyperarc_set: Vec<HyperArc> = Vec::new();
         
-        hyperarc_set.insert(array![2, 0, -1]);
-        hyperarc_set.insert(array![2, 0, 1]);
-        hyperarc_set.insert(array![0, -1, -1]);
-        hyperarc_set.insert(array![1, -1, -1]);
-        hyperarc_set.insert(array![2, -1, -1]);
+        hyperarc_set.push(HyperArc{ tail: HashSet::from([2]), head: 0});
+        hyperarc_set.push(HyperArc{ tail: HashSet::from([2, 0]), head: 1});
+        hyperarc_set.push(HyperArc{ tail: HashSet::new(), head: 0});
+        hyperarc_set.push(HyperArc{ tail: HashSet::new(), head: 1});
+        hyperarc_set.push(HyperArc{ tail: HashSet::new(), head: 2});
         
-        let expected: (IndexSet<Array1<i8>>, Array1<f64>) = (
-            hyperarc_set, 
+        let expected: (Array1<HyperArc>, Array1<f64>) = (
+            hyperarc_set.into(), 
             array![0.25, 0.25, 0., 0., 0.,]
         );
         
@@ -803,7 +838,6 @@ mod tests {
     }
    
     
-    /*
     #[test]
     fn di_construct_dihypergraph() {
         
@@ -817,9 +851,39 @@ mod tests {
             [ 1, 0, 2,],
             [ 0, 1,-1,],
             [ 0, 2,-1,],];
+            
+            
+        let ps = compute_progset(&data);
+        let inc_mat = compute_incidence_matrix(&ps.0);
+        let info = compute_hyperedge_info(&ps.0);
+        let hyperedge_weights = compute_hyperedge_weights(
+            &ps.0,
+            &info.0,
+            &ps.1
+        );
+        let hyperedge_wl = compute_hyperedge_worklist(&inc_mat);
+        
+        let hyperarc: (Array1<HyperArc>, Array1<f64>) = compute_hyperarc_weights(
+            &hyperedge_wl,
+            &ps.1, // hyperedge_prev 
+            &ps.2, // hyperarc_prev 
+            &hyperedge_weights,
+        );
+   
+        let expected = DiHypergraphBase{
+            incidence_matrix: inc_mat,
+            hyperedge_list: ps.0,
+            hyperedge_weights: hyperedge_weights,
+            hyperarc_list: hyperarc.0,
+            hyperarc_weights: hyperarc.1,
+        };
         
         let out = compute_directed_hypergraph(&data);
-        assert!(false);   
+        
+        assert_eq!(out.incidence_matrix, expected.incidence_matrix);
+        assert_eq!(out.hyperedge_list, expected.hyperedge_list);
+        assert_eq!(out.hyperedge_weights, expected.hyperedge_weights);
+        assert_eq!(out.hyperarc_list, expected.hyperarc_list);
+        assert_eq!(out.hyperarc_weights, expected.hyperarc_weights);
     }
-    */
 }
