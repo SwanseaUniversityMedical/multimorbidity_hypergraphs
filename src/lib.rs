@@ -15,6 +15,7 @@ use pyo3::exceptions::PyException;
 
 
 use undirected_hypergraphs::*;
+use directed_hypergraphs::*;
 use types::*; 
 
 /*
@@ -47,6 +48,22 @@ pub struct Hypergraph{
     #[pyo3(get, set)]
     pub node_list: Vec<String>,
 }
+
+
+#[pyclass]
+pub struct DiHypergraph {
+    #[pyo3(get, set)]
+    pub incidence_matrix: Py<PyArray2<i8>>, 
+    #[pyo3(get, set)]
+    pub hyperedge_list: Vec<PyObject>, 
+    #[pyo3(get, set)]
+    pub hyperedge_weights: Vec<f64>,
+    #[pyo3(get, set)]
+    pub hyperarc_list: Vec<HyperArc>,
+    #[pyo3(get, set)]
+    pub hyperarc_weights: Vec<f64>,
+}
+
 
 trait ToRust<T> {
     fn to_rust(&self) -> T;
@@ -256,5 +273,7 @@ impl ToRust<HypergraphBase> for Hypergraph {
 #[pymodule]
 pub fn multimorbidity_hypergraphs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Hypergraph>()?;
+    m.add_class::<HyperArc>()?;
+    m.add_class::<DiHypergraph>()?;
     Ok(())
 }

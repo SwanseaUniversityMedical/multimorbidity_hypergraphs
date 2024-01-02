@@ -1,4 +1,5 @@
 
+use pyo3::pyclass;
 use ndarray::{Array1, Array2};
 use std::collections::HashSet;
 use indexmap::IndexSet;
@@ -19,9 +20,16 @@ pub struct HypergraphBase {
 }
 
 
-#[derive(Debug, PartialEq)]
+// TODO - was trying to keep the python specific bits of the code
+// to just lib.rs. Decide whether to have a lib.rs and a py_types.rs
+// and then eventually r_lib.rs and r_types.rs...
+// Alternative is probably a lot of copying...
+#[derive(Clone, Debug, PartialEq)]
+#[pyclass]
 pub struct HyperArc {
+    #[pyo3(get, set)]
     pub tail: HashSet<i8>,
+    #[pyo3(get, set)]
     pub head: i8
 }
 
