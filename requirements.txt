@@ -1,0 +1,7 @@
+numpy==2.2.0
+pandas==2.2.3
+polars==1.17.1
+pytest==8.3.4
+scipy==1.14.1
+six==1.17.0
+statsmodels==0.14.4

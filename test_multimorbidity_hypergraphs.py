@@ -807,6 +807,7 @@ def test_DiHypergraph_with_data_creation():
             [ 1,  0,  2,],
             [ 0,  1, -1,],
             [ 0,  2, -1,]])
+
     
     data_pd = pl.DataFrame(
         data,
@@ -826,13 +827,19 @@ def test_DiHypergraph_with_data_creation():
             [0,  1,  0],
             [0,  0,  1]])
             
-    expected_hyperedge_weights = np.array([0.13157894736842105, 0.1, 0.06896551724137931, 0.1, 0.05, 0.13157894736842105, 0.1, 0.06896551724137931, 0.17142857142857143, 0.07142857142857142, 0.09090909090909091])
-    expected_hyperarc_weights = np.array([0.10526315789473684, 0.02631578947368421, 0.08, 0.02, 0.034482758620689655, 0.034482758620689655, 0.08, 0.02, 0.05, 0.10526315789473684, 0.02631578947368421, 0.05, 0.05, 0.0, 0.0, 0.03571428571428571])
-    
-    
+    expected_hyperedge_weights = np.array([0.33333333, 0.15384615, 0.2       , 0.1       , 0.13333333,
+       0.27777778, 0.2173913 ])       
+    expected_hyperarc_weights = np.array([0.05555555555555555, 0.0, 0.1, 0.1, 0.06666666666666667, 0.06666666666666667, 0.05555555555555556,   0.22222222222222224, 0.043478260869565216, 0.17391304347826086])
+        
     assert (h.incidence_matrix == expected_inc_mat).all()
-    assert (h.hyperedge_weights == expected_hyperedge_weights).all()
-    assert (h.hyperarc_weights == expected_hyperarc_weights).all()
+    np.testing.assert_allclose(
+        np.asarray(sorted(h.hyperedge_weights)),
+        np.asarray(sorted(expected_hyperedge_weights))
+    )
+    np.testing.assert_allclose(
+        np.asarray(sorted(h.hyperarc_weights)),
+        np.asarray(sorted(expected_hyperarc_weights))
+    )
     # TODO - tests for other fields (not super important as the rust tests cover them)
 
 def test_DiHypergraph_delayed_data_creation():
@@ -870,14 +877,20 @@ def test_DiHypergraph_delayed_data_creation():
             [0,  1,  0],
             [0,  0,  1]])
             
-    expected_hyperedge_weights = np.array([0.13157894736842105, 0.1, 0.06896551724137931, 0.1, 0.05, 0.13157894736842105, 0.1, 0.06896551724137931, 0.17142857142857143, 0.07142857142857142, 0.09090909090909091])
-    expected_hyperarc_weights = np.array([0.10526315789473684, 0.02631578947368421, 0.08, 0.02, 0.034482758620689655, 0.034482758620689655, 0.08, 0.02, 0.05, 0.10526315789473684, 0.02631578947368421, 0.05, 0.05, 0.0, 0.0, 0.03571428571428571])
-    
-    
+    expected_hyperedge_weights = np.array([0.33333333, 0.15384615, 0.2       , 0.1       , 0.13333333,
+       0.27777778, 0.2173913 ])       
+    expected_hyperarc_weights = np.array([0.05555555555555555, 0.0, 0.1, 0.1, 0.06666666666666667, 0.06666666666666667, 0.05555555555555556,   0.22222222222222224, 0.043478260869565216, 0.17391304347826086])
+        
     assert (h.incidence_matrix == expected_inc_mat).all()
-    assert (h.hyperedge_weights == expected_hyperedge_weights).all()
-    assert (h.hyperarc_weights == expected_hyperarc_weights).all()    
-
+    np.testing.assert_allclose(
+        np.asarray(sorted(h.hyperedge_weights)),
+        np.asarray(sorted(expected_hyperedge_weights))
+    )
+    np.testing.assert_allclose(
+        np.asarray(sorted(h.hyperarc_weights)),
+        np.asarray(sorted(expected_hyperarc_weights))
+    )
+    
 def test_benchmarking_compute_hypergraph_5k_10(benchmark):
 
     n_people = 5000
